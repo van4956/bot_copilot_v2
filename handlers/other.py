@@ -81,13 +81,13 @@ async def process_help_command(message: Message, workflow_data: dict, state: FSM
 def get_keyboard():
     button_1 = InlineKeyboardButton(text=_('🇺🇸 Английский'), callback_data='locale_en')
     button_2 = InlineKeyboardButton(text=_('🇷🇺 Русский'), callback_data='locale_ru')
-    button_3 = InlineKeyboardButton(text=_('🇩🇪 Немецкий'), callback_data='locale_de')
-    button_5 = InlineKeyboardButton(text=_('🇯🇵 Японский'), callback_data='locale_ja')
+    # button_3 = InlineKeyboardButton(text=_('🇩🇪 Немецкий'), callback_data='locale_de')
+    # button_5 = InlineKeyboardButton(text=_('🇯🇵 Японский'), callback_data='locale_ja')
     button_6 = InlineKeyboardButton(text=_('Назад'), callback_data='back_to_info')
     button_7 = InlineKeyboardButton(text=_('Назад на главную ↩️'), callback_data='about_back_to_main') # обработчик этой кнопки в private.py
 
-    return InlineKeyboardMarkup(inline_keyboard=[[button_1, button_2], [button_3, button_5], [button_6], [button_7]])
-
+    # return InlineKeyboardMarkup(inline_keyboard=[[button_1, button_2], [button_3, button_5], [button_6], [button_7]])
+    return InlineKeyboardMarkup(inline_keyboard=[[button_1, button_2], [button_6], [button_7]])
 
 # Это хендлер будет срабатывать на нажатие inline кнопки "Сменить язык"
 @other_router.callback_query(F.data == "lang")
@@ -114,7 +114,7 @@ async def update_locale_cmd(callback: CallbackQuery, session: AsyncSession, stat
         await callback.message.delete()
         await callback.answer("Selected: 🇺🇸 English")  # Отправляем всплывашку
         await callback.message.answer("Current language \n\n 🇺🇸 English", # Отправляем новое сообщение
-                                      reply_markup=keyboard.get_keyboard("Weather 🌊", "Currency 💵", "Cats 🐱", "LLMs 🤖", sizes=(2, 2, ), placeholder='⬇️'))
+                                      reply_markup=keyboard.get_keyboard("Weather 🌊", "Currency 💵", "Cats 🐱", "Cookbook 📖", sizes=(2, 2, ), placeholder='⬇️'))
 
     elif callback.data == 'locale_ru':
         await orm_update_locale(session, user_id, 'ru')  # Обновляем локаль в бд
@@ -123,25 +123,25 @@ async def update_locale_cmd(callback: CallbackQuery, session: AsyncSession, stat
         await callback.message.delete()
         await callback.answer("Выбран: 🇷🇺 Русский язык")  # Отправляем всплывашку
         await callback.message.answer("Текущий язык \n\n 🇷🇺 Русский", # Отправляем новое сообщение
-                                      reply_markup=keyboard.get_keyboard("Погода 🌊", "Валюта 💵", "Котики 🐱", "LLMs 🤖", sizes=(2, 2, ), placeholder='⬇️'))
+                                      reply_markup=keyboard.get_keyboard("Погода 🌊", "Валюта 💵", "Котики 🐱", "Книга 📖", sizes=(2, 2, ), placeholder='⬇️'))
 
-    elif callback.data == 'locale_de':
-        await orm_update_locale(session, user_id, 'de')  # Обновляем локаль в бд
-        await state.update_data(locale='de')  # Обновляем локаль в контексте
-        # await callback.message.edit_text('Wählen Sie eine Sprache ', reply_markup=None)  # type: ignore # Редактируем сообщение,скрываем клавиатуру
-        await callback.message.delete()
-        await callback.answer("Ausgewählt: 🇩🇪 Deutsch")  # Отправляем всплывашку
-        await callback.message.answer("Aktuelle Sprache \n\n 🇩🇪 Deutsch",   # Отправляем новое сообщение
-                                      reply_markup=keyboard.get_keyboard("Wetter 🌊", "Währung 💵", "Katzen 🐱", "LLMs 🤖", sizes=(2, 2, ), placeholder='⬇️'))
+    # elif callback.data == 'locale_de':
+    #     await orm_update_locale(session, user_id, 'de')  # Обновляем локаль в бд
+    #     await state.update_data(locale='de')  # Обновляем локаль в контексте
+    #     # await callback.message.edit_text('Wählen Sie eine Sprache ', reply_markup=None)  # type: ignore # Редактируем сообщение,скрываем клавиатуру
+    #     await callback.message.delete()
+    #     await callback.answer("Ausgewählt: 🇩🇪 Deutsch")  # Отправляем всплывашку
+    #     await callback.message.answer("Aktuelle Sprache \n\n 🇩🇪 Deutsch",   # Отправляем новое сообщение
+    #                                   reply_markup=keyboard.get_keyboard("Wetter 🌊", "Währung 💵", "Katzen 🐱", "LLMs 🤖", sizes=(2, 2, ), placeholder='⬇️'))
 
-    elif callback.data == 'locale_ja':
-        await orm_update_locale(session, user_id, 'ja')  # Обновляем локаль в бд
-        await state.update_data(locale='ja')  # Обновляем локаль в контексте
-        # await callback.message.edit_text('言語を選択してください ', reply_markup=None)  # type: ignore # Редактируем сообщение,скрываем клавиатуру
-        await callback.message.delete()
-        await callback.answer("選択された: 🇯🇵 日本語")  # Отправляем всплывашку
-        await callback.message.answer("現在の言語 \n\n 🇯🇵 日本語",   # Отправляем новое сообщение
-                                      reply_markup=keyboard.get_keyboard("テンキ 🌊", "カワセ 💵", "ネコ 🐱", "エルエルエム 🤖", sizes=(2, 2, ), placeholder='⬇️'))
+    # elif callback.data == 'locale_ja':
+    #     await orm_update_locale(session, user_id, 'ja')  # Обновляем локаль в бд
+    #     await state.update_data(locale='ja')  # Обновляем локаль в контексте
+    #     # await callback.message.edit_text('言語を選択してください ', reply_markup=None)  # type: ignore # Редактируем сообщение,скрываем клавиатуру
+    #     await callback.message.delete()
+    #     await callback.answer("選択された: 🇯🇵 日本語")  # Отправляем всплывашку
+    #     await callback.message.answer("現在の言語 \n\n 🇯🇵 日本語",   # Отправляем новое сообщение
+    #                                   reply_markup=keyboard.get_keyboard("テンキ 🌊", "カワセ 💵", "ネコ 🐱", "エルエルエム 🤖", sizes=(2, 2, ), placeholder='⬇️'))
 
 
 # секретный хендлер, покажет содержимое data пользователя
@@ -177,7 +177,7 @@ async def terms_cmd(callback: CallbackQuery, state: FSMContext):
               "2. Бот старается быть точным, но иногда может ошибаться. Он всё-таки не человек, а просто очень умная программа.\n\n"
               "3. Фотографии котиков безопасны и проходят строгий отбор на милоту.\n\n"
               "4. Прогноз погоды и курсы валют берутся из надёжных источников, но используйте эти данные на своё усмотрение.\n\n"
-              "5. Общение с ИИ (LLM) модулем может быть познавательным, но помните - это не замена реальному общению.\n\n"
+              "5. Рецепты из Кулинарной книги проверены на съедобность. Но за ваши кулинарные эксперименты бот не в ответе!\n\n"
               "6. Калькулятор пиццы поможет с расчётами, но окончательный выбор пиццы всегда за вами!\n\n"
               "7. Все донаты добровольные. Бот будет одинаково дружелюбен ко всем пользователям.\n\n"
               "8. В случае сбоев не переживайте - просто подождите немного или перезапустите бота.\n\n")

@@ -46,8 +46,7 @@ async def start_cmd(message: Message, session: AsyncSession, bot: Bot, state: FS
         list_users = [user_id for user_id in await orm_get_ids(session)]
         chat_id = bot.home_group[0]
         if user_id not in list_users:
-            await bot.send_message(chat_id=chat_id, text=_("✅ <code>@{user_name}</code> - подписался на бота").format(user_name=user_name,
-                                                                                                                                     user_id=user_id))
+            await bot.send_message(chat_id=chat_id, text=f"✅ @{user_name} - подписался на бота")
             image_from_pc = FSInputFile("common/images/image_updates.jpg")
             await message.answer_photo(photo=image_from_pc,
                                        caption=_('Привет {user_name}.\n\n'
@@ -75,7 +74,7 @@ async def process_user_blocked_bot(event: ChatMemberUpdated, session: AsyncSessi
     chat_id = bot.home_group[0]
     user_name = event.from_user.username if event.from_user.username else event.from_user.full_name
     await orm_update_status(session, user_id, 'kicked')
-    await bot.send_message(chat_id = chat_id, text = _("⛔️ <code>@{user_name}</code> - заблокировал бота ").format(user_name=user_name, user_id=user_id))
+    await bot.send_message(chat_id = chat_id, text = f"⛔️ @{user_name} - заблокировал бота ")
 
 # Этот хэндлер будет срабатывать на разблокировку бота пользователем
 @start_router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=MEMBER))
@@ -89,4 +88,4 @@ async def process_user_unblocked_bot(event: ChatMemberUpdated, session: AsyncSes
         await orm_update_status(session, user_id, 'member')
         await bot.send_photo(chat_id=user_id, photo=FSInputFile("common/images/image_updates.jpg"))
         await bot.send_message(chat_id = user_id, text = _('{full_name}, Добро пожаловать обратно!').format(full_name=full_name))
-        await bot.send_message(chat_id = chat_id, text = _("♻️ <code>@{user_name}</code> - разблокировал бота ").format(user_name=user_name, user_id=user_id))
+        await bot.send_message(chat_id = chat_id, text = f"♻️ @{user_name} - разблокировал бота ")

@@ -3,7 +3,8 @@ import logging
 # Настраиваем базовую конфигурацию логирования
 # WARNING - самое важное, для прода, для контейнера
 # INFO - подробный, для отладки
-logging.basicConfig(level=logging.WARNING, format='  -  [%(asctime)s] #%(levelname)-5s -  %(name)s:%(lineno)d  -  %(message)s')
+# logging.basicConfig(level=logging.WARNING, format=' - [%(asctime)s] #%(levelname)-5s -  %(name)s:%(lineno)d  -  %(message)s')
+logging.basicConfig(level=logging.WARNING, format=' - [%(asctime)s] #%(levelname)-5s - %(name)s:%(lineno)d  -  %(message)s', datefmt='%y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
 # Настраиваем логгер для SQLAlchemy
@@ -21,9 +22,11 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import Update
 from aiogram.fsm.strategy import FSMStrategy
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.utils.i18n import ConstI18nMiddleware, I18n, SimpleI18nMiddleware, FSMI18nMiddleware
+from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from config_data.config import Config, load_config
@@ -35,18 +38,25 @@ from middlewares import counter, db, locale, throttle
 
 
 # Режим запуска:
-# docker == 1 - запуск в docker,
-# docker == 0 - запуск локально
-docker = 0
+# docker == 1 - запуск в docker (docker-compose up --build)
+# docker == 0 - запуск локально (python app.py)
+docker = 1
 
 # Загружаем конфиг в переменную config
 config: Config = load_config()
 
 # Инициализируем объект хранилища
-# данные хранятся в оперативной памяти, при перезапуске всё стирается
-storage = MemoryStorage()
+if docker == 1:
+    # Для Docker режима данные хранятся на отдельном сервере Redis
+    storage = RedisStorage(
+        redis=Redis(
+            host=config.redis.host,
+            port=config.redis.port))
+else:
+    # Иначе, данные хранятся в оперативной памяти, при перезапуске всё стирается (для тестов и разработки)
+    storage = MemoryStorage()
 
-# формируем рабочий токен бота если docker == 1, иначе используем тестовый токен
+# Формируем рабочий токен бота если в Docker режиме, иначе используем тестовый токен
 if docker == 1:
     token = config.tg_bot.token
 else:

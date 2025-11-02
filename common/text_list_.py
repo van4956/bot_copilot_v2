@@ -59,4 +59,3 @@ text_sistem_promt = ('###Answering Rules###\n\n'
                 '<Deep knowledge step-by-step answer, with CONCRETE details>'
                 )
 
-print(sistem_promt)

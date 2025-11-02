@@ -6,10 +6,10 @@
 
 - 🌊 Weather forecast
 - 💵 Currency exchange rates
-- 😺 Random cat photos
+- 😺 Cat photos
 - 📖 Cookbook
 - 🍕 Pizza calculator
-- 💝 Donation system
+- 🙏 Donation system
 - 🎮 Mini-games
 
 ## Technologies
@@ -32,11 +32,11 @@
 bot_04_copilot_v2/
 ├── app.py                 # Entry point
 ├── handlers/              # Command handlers
-├── middlewares/          # Middleware processors
-├── database/             # Database operations
-├── common/               # Common components
-├── locales/              # Localization files
-└── docs/                 # Web applications
+├── middlewares/           # Middleware processors
+├── database/              # Database operations
+├── common/                # Common components
+├── locales/               # Localization files
+└── docs/                  # Web applications
 ```
 
 

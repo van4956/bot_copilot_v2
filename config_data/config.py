@@ -33,12 +33,21 @@ class DataBase:
     db_post: str
 
 @dataclass
+class Redis:
+    """
+    Класс для хранения информации о Redis
+    """
+    host: str
+    port: int
+
+@dataclass
 class Config:
     """
     Основной класс конфигурации всего приложения
     """
     tg_bot: TgBot
     db: DataBase
+    redis: Redis
 
 # Функция загрузки конфигурации из файла окружения .env
 def load_config(path: str | None = None) -> Config:
@@ -60,4 +69,6 @@ def load_config(path: str | None = None) -> Config:
                                api_currency=env('API_CURRENCY'),
                                api_weather=env('API_WEATHER')),
                   db=DataBase(db_post=env('DB_POST'),
-                              db_lite=env('DB_LITE')))
+                              db_lite=env('DB_LITE')),
+                  redis=Redis(host=env('REDIS_HOST'),
+                              port=env('REDIS_PORT')))

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: bot_00_template 0.1\n"
 "Report-Msgid-Bugs-To: gontscharowiwan@yandex.ru\n"
-"POT-Creation-Date: 2025-02-04 11:49+0400\n"
+"POT-Creation-Date: 2025-11-02 15:27+0400\n"
 "PO-Revision-Date: 2024-10-31 15:07+0800\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru\n"
@@ -33,46 +33,48 @@ msgid "Котики 🐱"
 msgstr "Котики 🐱"
 
 #: common/keyboard.py:51
-msgid "LLMs 🤖"
-msgstr "LLMs 🤖"
+msgid "Книга 📖"
+msgstr "Книга 📖"
 
-#: handlers/cookbook.py:40
+#: handlers/cookbook.py:42
 msgid "Книга рецептов"
 msgstr "Книга рецептов"
 
-#: handlers/cookbook.py:63 handlers/cookbook.py:101 handlers/cookbook.py:138
-#: handlers/cookbook.py:177 handlers/currency.py:123 handlers/currency.py:145
-#: handlers/currency.py:184 handlers/currency.py:189 handlers/donate.py:46
-#: handlers/donate.py:63 handlers/llm.py:53 handlers/llm.py:62
-#: handlers/llm.py:151 handlers/llm.py:160 handlers/llm.py:169
-#: handlers/miniapp.py:41 handlers/miniapp.py:93 handlers/miniapp.py:101
-#: handlers/other.py:43 handlers/other.py:93 handlers/other.py:196
-#: handlers/other.py:232 handlers/private.py:89 handlers/private.py:134
-#: handlers/weather.py:184 handlers/weather.py:300 handlers/weather.py:309
-#: handlers/weather.py:333 handlers/weather.py:360 handlers/weather.py:380
-#: handlers/weather.py:395
+#: handlers/cookbook.py:55
+msgid "Книга рецептов пуста"
+msgstr "Книга рецептов пуста"
+
+#: handlers/cookbook.py:72 handlers/cookbook.py:107 handlers/cookbook.py:146
+#: handlers/cookbook.py:185 handlers/currency.py:118 handlers/currency.py:140
+#: handlers/currency.py:179 handlers/currency.py:184 handlers/donate.py:46
+#: handlers/donate.py:63 handlers/miniapp.py:41 handlers/miniapp.py:81
+#: handlers/miniapp.py:89 handlers/other.py:43 handlers/other.py:87
+#: handlers/other.py:185 handlers/other.py:221 handlers/private.py:89
+#: handlers/private.py:129 handlers/weather.py:184 handlers/weather.py:296
+#: handlers/weather.py:305 handlers/weather.py:329 handlers/weather.py:356
+#: handlers/weather.py:376 handlers/weather.py:391
 msgid "Назад на главную ↩️"
 msgstr "Назад на главную ↩️"
 
-#: handlers/cookbook.py:69
+#: handlers/cookbook.py:78
 msgid "Ошибка при выполнении команды /cookbook"
 msgstr "Ошибка при выполнении команды /cookbook"
 
-#: handlers/cookbook.py:109
+#: handlers/cookbook.py:115
 msgid "Ошибка при выполнении inline кнопки '>>'"
 msgstr "Ошибка при выполнении inline кнопки '>>'"
 
-#: handlers/cookbook.py:145
+#: handlers/cookbook.py:153
 msgid "Ошибка при выполнении inline кнопки '<<'"
 msgstr "Ошибка при выполнении inline кнопки '<<'"
 
-#: handlers/cookbook.py:179 handlers/donate.py:80 handlers/donate.py:153
-#: handlers/miniapp.py:103 handlers/private.py:44 handlers/private.py:57
-#: handlers/private.py:135
+#: handlers/cookbook.py:187 handlers/donate.py:80 handlers/donate.py:159
+#: handlers/donate.py:224 handlers/miniapp.py:91 handlers/private.py:44
+#: handlers/private.py:57 handlers/private.py:130
 msgid "Главная панель"
 msgstr "Главная панель"
 
-#: handlers/cookbook.py:183
+#: handlers/cookbook.py:191
 msgid "Ошибка при выполнении inline кнопки 'Назад на главную ↩️'"
 msgstr "Ошибка при выполнении inline кнопки 'Назад на главную ↩️'"
 
@@ -96,11 +98,11 @@ msgstr "Проблема в расчете даты."
 msgid "Ошибка: Проблема с подключением к API"
 msgstr "Ошибка: Проблема с подключением к API"
 
-#: handlers/currency.py:99 handlers/currency.py:121
+#: handlers/currency.py:99 handlers/currency.py:116
 msgid "Сумма операции: 0.0"
 msgstr "Сумма операции: 0.0"
 
-#: handlers/currency.py:116
+#: handlers/currency.py:111
 msgid ""
 "Сумма операции: {user_value}\n"
 "Базовая валюта: "
@@ -108,29 +110,29 @@ msgstr ""
 "Сумма операции: {user_value}\n"
 "Базовая валюта: "
 
-#: handlers/currency.py:122 handlers/currency.py:144 handlers/currency.py:183
-#: handlers/currency.py:188
+#: handlers/currency.py:117 handlers/currency.py:139 handlers/currency.py:178
+#: handlers/currency.py:183
 msgid "Что дальше?"
 msgstr "Что дальше?"
 
-#: handlers/currency.py:123 handlers/currency.py:145 handlers/currency.py:184
-#: handlers/currency.py:189
+#: handlers/currency.py:118 handlers/currency.py:140 handlers/currency.py:179
+#: handlers/currency.py:184
 msgid "Повторить 💵"
 msgstr "Повторить 💵"
 
-#: handlers/currency.py:143
+#: handlers/currency.py:138
 msgid "Ошибка в получении суммы"
 msgstr "Ошибка в получении суммы"
 
-#: handlers/currency.py:146
+#: handlers/currency.py:141
 msgid "Ошибка"
 msgstr "Ошибка"
 
-#: handlers/currency.py:153
+#: handlers/currency.py:148
 msgid "Вы ввели не допустимые данные, введите сумму используя inline кнопки"
 msgstr "Вы ввели не допустимые данные, введите сумму используя inline кнопки"
 
-#: handlers/currency.py:161
+#: handlers/currency.py:156
 msgid ""
 "Сумма операции: {amount}\n"
 "Базовая валюта: {base}\n"
@@ -140,7 +142,7 @@ msgstr ""
 "Базовая валюта: {base}\n"
 "Целевая валюта: "
 
-#: handlers/currency.py:167
+#: handlers/currency.py:162
 msgid ""
 "Вы ввели не допустимые данные, введите базовую валюту используя inline "
 "кнопки"
@@ -148,7 +150,7 @@ msgstr ""
 "Вы ввели не допустимые данные, введите базовую валюту используя inline "
 "кнопки"
 
-#: handlers/currency.py:181
+#: handlers/currency.py:176
 msgid ""
 "Сумма операции: {amount}\n"
 "Базовая валюта: {base}\n"
@@ -166,11 +168,11 @@ msgstr ""
 "\n"
 "<b>{amount} {base}  ~  {count} {target}</b>"
 
-#: handlers/currency.py:190
+#: handlers/currency.py:185
 msgid "Успех"
 msgstr "Успех"
 
-#: handlers/currency.py:196
+#: handlers/currency.py:191
 msgid ""
 "Вы ввели не допустимые данные, введите целевую валюту используя inline "
 "кнопки"
@@ -183,7 +185,7 @@ msgid "другое"
 msgstr "другое"
 
 #: handlers/donate.py:47 handlers/donate.py:64 handlers/donate.py:77
-#: handlers/donate.py:103 handlers/donate.py:131
+#: handlers/donate.py:103 handlers/donate.py:134
 msgid "Поддержать автора донатом"
 msgstr "Поддержать автора донатом"
 
@@ -195,19 +197,19 @@ msgstr "Назад на главную"
 msgid "Введите произвольную сумму доната, от 1 до 2500 ⭐️"
 msgstr "Введите произвольную сумму доната, от 1 до 2500 ⭐️"
 
-#: handlers/donate.py:96 handlers/donate.py:124
+#: handlers/donate.py:96 handlers/donate.py:127
 msgid "{amount} XTR"
 msgstr "{amount} XTR"
 
-#: handlers/donate.py:97 handlers/donate.py:125
+#: handlers/donate.py:97 handlers/donate.py:128
 msgid "Отменить"
 msgstr "Отменить"
 
-#: handlers/donate.py:104 handlers/donate.py:132
+#: handlers/donate.py:104 handlers/donate.py:135
 msgid "На сумму"
 msgstr "На сумму"
 
-#: handlers/donate.py:142
+#: handlers/donate.py:148
 msgid ""
 "Telegram может принять донат только в диапазоне от 1 до 2500 ⭐️.\n"
 "\n"
@@ -217,11 +219,11 @@ msgstr ""
 "\n"
 "Введите любое целое число из данного диапазона."
 
-#: handlers/donate.py:149
+#: handlers/donate.py:155
 msgid "😢 Донат отменен."
 msgstr "😢 Донат отменен."
 
-#: handlers/donate.py:191
+#: handlers/donate.py:208
 msgid ""
 "<b>Спасибо!</b>\n"
 "Ваш донат успешно принят.\n"
@@ -235,55 +237,11 @@ msgstr ""
 "ID транзакции:\n"
 "<code>{t_id}</code>"
 
-#: handlers/llm.py:51
-msgid "Введите системный промт"
-msgstr "Введите системный промт"
-
-#: handlers/llm.py:52
-msgid ""
-"Например:\n"
-"\n"
-"<code>Ты полезный помощник. Твой тон должен быть официальным. Ответы "
-"должны быть краткими и понятными.</code>"
-msgstr ""
-"Например:\n"
-"\n"
-"<code>Ты полезный помощник. Твой тон должен быть официальным. Ответы "
-"должны быть краткими и понятными.</code>"
-
-#: handlers/llm.py:53 handlers/llm.py:141
-msgid "Сразу к запросу ▶️"
-msgstr "Сразу к запросу ▶️"
-
-#: handlers/llm.py:62 handlers/llm.py:168
-msgid "Начать новый диалог 🤖"
-msgstr "Начать новый диалог 🤖"
-
-#: handlers/llm.py:150
-msgid "Введите ваш запрос"
-msgstr "Введите ваш запрос"
-
-#: handlers/llm.py:167
-msgid ""
-"Диалог завершен.\n"
-"Что дальше?"
-msgstr ""
-"Диалог завершен.\n"
-"Что дальше?"
-
-#: handlers/llm.py:263
-msgid "Закончить диалог"
-msgstr "Закончить диалог"
-
-#: handlers/llm.py:265
-msgid "Введите следующий запрос"
-msgstr "Введите следующий запрос"
-
-#: handlers/miniapp.py:39 handlers/miniapp.py:91
+#: handlers/miniapp.py:39 handlers/miniapp.py:79
 msgid "Сервисы"
 msgstr "Сервисы"
 
-#: handlers/miniapp.py:40 handlers/miniapp.py:92
+#: handlers/miniapp.py:40 handlers/miniapp.py:80
 msgid "Игры"
 msgstr "Игры"
 
@@ -299,16 +257,16 @@ msgstr "🍕 Калькулятор"
 msgid "🎲 Рандомайзер"
 msgstr "🎲 Рандомайзер"
 
-#: handlers/miniapp.py:56 handlers/miniapp.py:75 handlers/other.py:92
-#: handlers/other.py:195 handlers/private.py:88
+#: handlers/miniapp.py:56 handlers/miniapp.py:69 handlers/other.py:86
+#: handlers/other.py:184 handlers/private.py:88
 msgid "Назад"
 msgstr "Назад"
 
-#: handlers/miniapp.py:73
+#: handlers/miniapp.py:67
 msgid "🕹 Платформа"
 msgstr "🕹 Платформа"
 
-#: handlers/miniapp.py:74
+#: handlers/miniapp.py:68
 msgid "🐍 Змейка"
 msgstr "🐍 Змейка"
 
@@ -316,47 +274,39 @@ msgstr "🐍 Змейка"
 msgid "Информация"
 msgstr "Информация"
 
-#: handlers/other.py:39 handlers/other.py:185 handlers/other.py:228
+#: handlers/other.py:39 handlers/other.py:174 handlers/other.py:217
 msgid "Условия использования"
 msgstr "Условия использования"
 
-#: handlers/other.py:40 handlers/other.py:229
+#: handlers/other.py:40 handlers/other.py:218
 msgid "Сменить язык"
 msgstr "Сменить язык"
 
-#: handlers/other.py:41 handlers/other.py:230
+#: handlers/other.py:41 handlers/other.py:219
 msgid "Об авторе"
 msgstr "Об авторе"
 
-#: handlers/other.py:42 handlers/other.py:231
+#: handlers/other.py:42 handlers/other.py:220
 msgid "Поддержать"
 msgstr "Поддержать"
 
-#: handlers/other.py:88
+#: handlers/other.py:82
 msgid "🇺🇸 Английский"
 msgstr "🇺🇸 Английский"
 
-#: handlers/other.py:89
+#: handlers/other.py:83
 msgid "🇷🇺 Русский"
 msgstr "🇷🇺 Русский"
 
-#: handlers/other.py:90
-msgid "🇩🇪 Немецкий"
-msgstr "🇩🇪 Немецкий"
-
-#: handlers/other.py:91
-msgid "🇯🇵 Японский"
-msgstr "🇯🇵 Японский"
-
-#: handlers/other.py:102
+#: handlers/other.py:96
 msgid "Настройки языка"
 msgstr "Настройки языка"
 
-#: handlers/other.py:104
+#: handlers/other.py:98
 msgid "Выберите язык на котором будет работать бот"
 msgstr "Выберите язык на котором будет работать бот"
 
-#: handlers/other.py:186
+#: handlers/other.py:175
 msgid ""
 "Terms of use @Terminatorvan_bot:\n"
 "\n"
@@ -371,8 +321,8 @@ msgid ""
 "4. Прогноз погоды и курсы валют берутся из надёжных источников, но "
 "используйте эти данные на своё усмотрение.\n"
 "\n"
-"5. Общение с ИИ (LLM) модулем может быть познавательным, но помните - это"
-" не замена реальному общению.\n"
+"5. Рецепты из Кулинарной книги проверены на съедобность. Но за ваши "
+"кулинарные эксперименты бот не в ответе!\n"
 "\n"
 "6. Калькулятор пиццы поможет с расчётами, но окончательный выбор пиццы "
 "всегда за вами!\n"
@@ -397,8 +347,8 @@ msgstr ""
 "4. Прогноз погоды и курсы валют берутся из надёжных источников, но "
 "используйте эти данные на своё усмотрение.\n"
 "\n"
-"5. Общение с ИИ (LLM) модулем может быть познавательным, но помните - это"
-" не замена реальному общению.\n"
+"5. Рецепты из Кулинарной книги проверены на съедобность. Но за ваши "
+"кулинарные эксперименты бот не в ответе!\n"
 "\n"
 "6. Калькулятор пиццы поможет с расчётами, но окончательный выбор пиццы "
 "всегда за вами!\n"
@@ -408,7 +358,6 @@ msgstr ""
 "\n"
 "8. В случае сбоев не переживайте - просто подождите немного или "
 "перезапустите бота.\n"
-
 
 #: handlers/private.py:55
 msgid "Действия отменены"
@@ -424,19 +373,15 @@ msgstr ""
 "создавая ботов, как первый шаг к спасению человечества через код и умные "
 "алгоритмы."
 
-#: handlers/private.py:154
+#: handlers/private.py:149
 msgid "Локальные изображения не найдены."
 msgstr "Локальные изображения не найдены."
 
-#: handlers/private.py:166
+#: handlers/private.py:161
 msgid "Здесь должна была быть картинка с котиком :("
 msgstr "Здесь должна была быть картинка с котиком :("
 
-#: handlers/start.py:49
-msgid "✅ <code>@{user_name}</code> - подписался на бота"
-msgstr "✅ <code>@{user_name}</code> - подписался на бота"
-
-#: handlers/start.py:53
+#: handlers/start.py:52
 msgid ""
 "Привет {user_name}.\n"
 "\n"
@@ -462,65 +407,114 @@ msgstr ""
 "Пока не обрету AGI.\n"
 "А там посмотрим ..."
 
-#: handlers/start.py:73
+#: handlers/start.py:67
 msgid "Бот активирован!"
 msgstr "Бот активирован!"
 
-#: handlers/start.py:88
-msgid "⛔️ <code>@{user_name}</code> - заблокировал бота "
-msgstr "⛔️ <code>@{user_name}</code> - заблокировал бота "
-
-#: handlers/start.py:106
+#: handlers/start.py:90
 msgid "{full_name}, Добро пожаловать обратно!"
 msgstr "{full_name}, Добро пожаловать обратно!"
 
-#: handlers/start.py:107
-msgid "♻️ <code>@{user_name}</code> - разблокировал бота "
-msgstr "♻️ <code>@{user_name}</code> - разблокировал бота "
-
-#: handlers/weather.py:183 handlers/weather.py:332 handlers/weather.py:359
-#: handlers/weather.py:379 handlers/weather.py:394
+#: handlers/weather.py:183 handlers/weather.py:328 handlers/weather.py:355
+#: handlers/weather.py:375 handlers/weather.py:390
 msgid "Выберите период прогноза"
 msgstr "Выберите период прогноза"
 
-#: handlers/weather.py:184 handlers/weather.py:333 handlers/weather.py:360
-#: handlers/weather.py:380 handlers/weather.py:395
+#: handlers/weather.py:184 handlers/weather.py:329 handlers/weather.py:356
+#: handlers/weather.py:376 handlers/weather.py:391
 msgid "Текущий ⏺"
 msgstr "Текущий ⏺"
 
-#: handlers/weather.py:184 handlers/weather.py:333 handlers/weather.py:360
-#: handlers/weather.py:380 handlers/weather.py:395
+#: handlers/weather.py:184 handlers/weather.py:329 handlers/weather.py:356
+#: handlers/weather.py:376 handlers/weather.py:391
 msgid "На 3 дня ⏩"
 msgstr "На 3 дня ⏩"
 
-#: handlers/weather.py:223
+#: handlers/weather.py:219
 msgid "Ошибка получения информации от OpenWeatherMap - {e}"
 msgstr "Ошибка получения информации от OpenWeatherMap - {e}"
 
-#: handlers/weather.py:292
+#: handlers/weather.py:288
 msgid "Ошибка в расчете json файла - {e}"
 msgstr "Ошибка в расчете json файла - {e}"
 
-#: handlers/weather.py:299 handlers/weather.py:308
+#: handlers/weather.py:295 handlers/weather.py:304
 msgid "Каким способом определить прогноз?"
 msgstr "Каким способом определить прогноз?"
 
-#: handlers/weather.py:300 handlers/weather.py:309
+#: handlers/weather.py:296 handlers/weather.py:305
 msgid "По названию 🏙"
 msgstr "По названию 🏙"
 
-#: handlers/weather.py:300 handlers/weather.py:309
+#: handlers/weather.py:296 handlers/weather.py:305
 msgid "По локации 🗺"
 msgstr "По локации 🗺"
 
-#: handlers/weather.py:319 handlers/weather.py:346
+#: handlers/weather.py:315 handlers/weather.py:342
 msgid "Введите название населенного пункта"
 msgstr "Введите название населенного пункта"
 
-#: handlers/weather.py:339 handlers/weather.py:366
+#: handlers/weather.py:335 handlers/weather.py:362
 msgid "Вы ввели не допустимые данные, введите название населенного пункта"
 msgstr "Вы ввели не допустимые данные, введите название населенного пункта"
 
-#: handlers/weather.py:372 handlers/weather.py:387
+#: handlers/weather.py:368 handlers/weather.py:383
 msgid "Локация получена"
 msgstr "Локация получена"
+
+#~ msgid "LLMs 🤖"
+#~ msgstr "LLMs 🤖"
+
+#~ msgid "Введите системный промт"
+#~ msgstr "Введите системный промт"
+
+#~ msgid ""
+#~ "Например:\n"
+#~ "\n"
+#~ "<code>Ты полезный помощник. Твой тон "
+#~ "должен быть официальным. Ответы должны "
+#~ "быть краткими и понятными.</code>"
+#~ msgstr ""
+#~ "Например:\n"
+#~ "\n"
+#~ "<code>Ты полезный помощник. Твой тон "
+#~ "должен быть официальным. Ответы должны "
+#~ "быть краткими и понятными.</code>"
+
+#~ msgid "Сразу к запросу ▶️"
+#~ msgstr "Сразу к запросу ▶️"
+
+#~ msgid "Начать новый диалог 🤖"
+#~ msgstr "Начать новый диалог 🤖"
+
+#~ msgid "Введите ваш запрос"
+#~ msgstr "Введите ваш запрос"
+
+#~ msgid ""
+#~ "Диалог завершен.\n"
+#~ "Что дальше?"
+#~ msgstr ""
+#~ "Диалог завершен.\n"
+#~ "Что дальше?"
+
+#~ msgid "Закончить диалог"
+#~ msgstr "Закончить диалог"
+
+#~ msgid "Введите следующий запрос"
+#~ msgstr "Введите следующий запрос"
+
+#~ msgid "🇩🇪 Немецкий"
+#~ msgstr "🇩🇪 Немецкий"
+
+#~ msgid "🇯🇵 Японский"
+#~ msgstr "🇯🇵 Японский"
+
+#~ msgid "✅ <code>@{user_name}</code> - подписался на бота"
+#~ msgstr "✅ <code>@{user_name}</code> - подписался на бота"
+
+#~ msgid "⛔️ <code>@{user_name}</code> - заблокировал бота "
+#~ msgstr "⛔️ <code>@{user_name}</code> - заблокировал бота "
+
+#~ msgid "♻️ <code>@{user_name}</code> - разблокировал бота "
+#~ msgstr "♻️ <code>@{user_name}</code> - разблокировал бота "
+

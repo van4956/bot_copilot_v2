@@ -212,6 +212,7 @@ def parse_weather_data(type_forecast, city, lat, lon, locale='ru'):
     try:
         req = requests.get(url, timeout=10)
         data = req.json()
+        ic(data)
 
     except (requests.RequestException, requests.JSONDecodeError) as e:
         logger.error("Ошибка: %s", str(e))

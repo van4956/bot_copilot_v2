@@ -7,6 +7,8 @@ services:
     depends_on:
       db:
         condition: service_started
+      redis:
+        condition: service_started
     deploy:
       resources:
         limits:
@@ -36,6 +38,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
     networks:
       - botnet # Подключение к сети botnet
     restart: unless-stopped # Автоматический перезапуск контейнера, если он остановится
@@ -55,7 +59,22 @@ services:
       - botnet
     restart: unless-stopped
 
+  redis:
+    image: redis:7.2-alpine # Образ Redis версии Alpine
+    container_name: container_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data # Сохраняем данные Redis как Docker volume
+    networks:
+      - botnet
+    restart: unless-stopped
+
 networks:
   botnet:
     name: botnet    # Принудительно задаем имя сети
     driver: bridge # Используем драйвер bridge для создания сети
+
+volumes:
+  redis_data:
+    driver: local # Используем локальный драйвер для хранения данных Redis

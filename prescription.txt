@@ -66,7 +66,7 @@ pybabel compile -d locales -D bot_00_template
 
 
 при обновлении кода, повторяем команду extract, обновляем файл .pot, в версию добавляем минорный релиз 0.1.1
-pybabel extract -o locales/messages.pot -k _:1,1t -k _:1,2 --copyright-holder="AdvancedBotTemplate" --project="bot_copilot_v2" --version=0.2.6 --msgid-bugs-address=gontscharowiwan@yandex.ru --input-dirs=.
+pybabel extract -o locales/messages.pot -k _:1,1t -k _:1,2 --copyright-holder="AdvancedBotTemplate" --project="bot_copilot_v2" --version=0.2.7 --msgid-bugs-address=gontscharowiwan@yandex.ru --input-dirs=.
 
 далее повторная генерация файлов с переводами для нужных локалей
 pybabel update -i locales/messages.pot -d locales -D bot_00_template -l en

@@ -31,11 +31,12 @@ cookbook_router.edited_message.filter(ChatTypeFilter(['private']))
 
 # Создаем константы для текстов, которые используются в декораторах
 BACK_TO_MAIN = __("Назад на главную ↩️")
+BOOK = __("Книга 📖")
 
 # Этот хэндлер будет срабатывать на команду "/cookbook"
 # и отправлять пользователю первую страницу книги с кнопками пагинации
 # @cookbook_router.message(Command(commands='book'))
-@cookbook_router.message(F.text == "Книга 📖")
+@cookbook_router.message(F.text == BOOK)
 async def process_cookbook_command(message: Message, state: FSMContext, session: AsyncSession):
     # photo = FSInputFile("common/images/image_cook.jpg")
     await message.answer(text=_("Книга рецептов"),
@@ -48,12 +49,16 @@ async def process_cookbook_command(message: Message, state: FSMContext, session:
         len_page = len(book)
         state_data = await state.get_data()
         users_page = state_data.get('page', 1)  # получаем сохраненную страницу книги, либо устанавливаем ее на 1
-        # переписать однострочник - срочно!!!
-        # caption = ("Что то пошло не так", FSInputFile("common\images\image_cookbook.jpg"))
-        # цикл for по book, если совпадает пересохраняем caption
-        caption = [(f"<b>{rec.recipe_name}</b>\n<i>Автор: {rec.author}</i>\n\n{rec.description}", rec.image) for rec in book if rec.recipe_id == users_page]
-        text = caption[0][0]
-        photo = caption[0][1]
+
+        # Проверяем, что страница находится в допустимых пределах
+        if users_page < 1 or users_page > len_page or len_page == 0:
+            await message.answer(_("Книга рецептов пуста"), reply_markup=keyboard.start_keyboard())
+            return
+
+        # Получаем рецепт по индексу (страница - 1, т.к. индексы с 0)
+        recipe = book[users_page - 1]
+        text = f"<b>{recipe.recipe_name}</b>\n<i>Автор: {recipe.author}</i>\n\n{recipe.description}"
+        photo = recipe.image
 
         # Обрезаем подпись, если она превышает 1024 символа
         if len(text) > 1024:
@@ -85,9 +90,11 @@ async def process_forward_press(callback: CallbackQuery, state: FSMContext, sess
         if users_page < len_page:
             users_page += 1
             await state.update_data(page=users_page)
-            caption = [(f"<b>{rec.recipe_name}</b>\n<i>Автор: {rec.author}</i>\n\n{rec.description}", rec.image) for rec in book if rec.recipe_id == users_page]
-            text = caption[0][0]
-            photo = caption[0][1]
+
+            # Получаем рецепт по индексу (страница - 1, т.к. индексы с 0)
+            recipe = book[users_page - 1]
+            text = f"<b>{recipe.recipe_name}</b>\n<i>Автор: {recipe.author}</i>\n\n{recipe.description}"
+            photo = recipe.image
 
             # Обрезаем подпись, если она превышает 1024 символа
             if len(text) > 1024:
@@ -122,9 +129,11 @@ async def process_backward_press(callback: CallbackQuery, state: FSMContext, ses
         if users_page > 1 and users_page <= len_page:
             users_page -= 1
             await state.update_data(page=users_page)
-            caption = [(f"<b>{rec.recipe_name}</b>\n<i>Автор: {rec.author}</i>\n\n{rec.description}", rec.image) for rec in book if rec.recipe_id == users_page]
-            text = caption[0][0]
-            photo = caption[0][1]
+
+            # Получаем рецепт по индексу (страница - 1, т.к. индексы с 0)
+            recipe = book[users_page - 1]
+            text = f"<b>{recipe.recipe_name}</b>\n<i>Автор: {recipe.author}</i>\n\n{recipe.description}"
+            photo = recipe.image
 
             # Обрезаем подпись, если она превышает 1024 символа
             if len(text) > 1024:
