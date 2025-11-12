@@ -25,10 +25,10 @@ from database.orm_games import orm_add_game
 miniapp_router = Router()
 
 # URL веб-приложения
-WEBAPP_URL_PIZZA = "https://van4956.github.io/bot_04_copilot_v2/pizza_calculator/"
-WEBAPP_URL_RANDOM = "https://van4956.github.io/bot_04_copilot_v2/random_generator/"
-WEBAPP_URL_SNAKE = "https://van4956.github.io/bot_04_copilot_v2/snake_game/"
-WEBAPP_URL_PLATFORM = "https://van4956.github.io/bot_04_copilot_v2/platform_game/"
+WEBAPP_URL_PIZZA = "https://van4956.github.io/bot_copilot_v2/pizza_calculator/"
+WEBAPP_URL_RANDOM = "https://van4956.github.io/bot_copilot_v2/random_generator/"
+WEBAPP_URL_SNAKE = "https://van4956.github.io/bot_copilot_v2/snake_game/"
+WEBAPP_URL_PLATFORM = "https://van4956.github.io/bot_copilot_v2/platform_game/"
 
 # команда /mini - "Мини-приложения"
 @miniapp_router.message(Command("mini"))

@@ -1,84 +1,84 @@
-body { /* тело страницы */
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; /* Установка системных шрифтов */
-    margin: 0; /* Убираем внешние отступы */
-    padding: 20px; /* Внутренний отступ от краев экрана */
-    min-height: 100vh; /* Минимальная высота на весь экран */
-    display: flex; /* Включаем флекс-контейнер */
-    justify-content: center; /* Центрирование по горизонтали */
-    align-items: center; /* Центрирование по вертикали */
-    background-color: rgb(23, 33, 43); /* Цвет фона страницы */
-    color: #F5F5F5; /* Цвет текста */
-    box-sizing: border-box; /* Включаем box-model */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgb(23, 33, 43);
+    color: #F5F5F5;
+    box-sizing: border-box;
 }
 
-.container { /* контейнер - это блок, в котором находится вся информация */
-    display: flex; /* Включаем флекс-контейнер */
-    flex-direction: column; /* Вертикальное расположение элементов */
-    align-items: center; /* Центрирование содержимого */
-    width: 100%; /* Полная ширина */
-    max-width: 400px; /* Максимальная ширина контейнера */
-    margin: 0 auto; /* Центрирование контейнера */
-    padding: 20px; /* Внутренние отступы */
-    background-color: rgb(47, 56, 65); /* Цвет фона контейнера */
-    border-radius: 12px; /* Скругление углов */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3); /* Тень контейнера */
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: rgb(47, 56, 65);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 h1 {
-    text-align: center; /* Центрирование заголовка */
-    margin-bottom: 30px; /* Отступ снизу */
-    font-size: 24px; /* Размер шрифта */
-    font-weight: 600; /* Жирность шрифта */
-    color: #F5F5F5; /* Цвет заголовка */
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #F5F5F5;
 }
 
-.calculator { /* калькулятор - это блок, в котором находится вся информация */
-    width: 100%; /* Полная ширина калькулятора */
-    padding: 20px; /* Внутренние отступы */
+.calculator {
+    width: 100%;
+    padding: 20px;
 }
 
 .input-group {
-    margin-bottom: 20px; /* Отступ между группами полей */
+    margin-bottom: 20px;
 }
 
-label { /* лейбл - это текст, который описывает поле ввода */
-    display: block; /* Блочное отображение */
-    margin-bottom: 8px; /* Отступ снизу */
-    font-size: 16px; /* Размер шрифта */
-    font-weight: 500; /* Жирность шрифта */
-    color: #F5F5F5; /* Цвет текста метки */
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #F5F5F5;
 }
 
 input { /* поле ввода, которое принимает число */
-    width: 100%; /* Полная ширина поля ввода */
-    padding: 8px; /* Внутренние отступы */
-    border: 1px solid #ddd; /* Граница поля ввода */
-    border-radius: 6px; /* Скругление углов */
-    font-size: 16px; /* Размер шрифта */
-    background-color: rgb(14, 22, 33); /* Цвет фона поля ввода */
-    color: #F5F5F5; /* Цвет текста */
-    box-sizing: border-box; /* Включаем box-model */
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    background-color: rgb(14, 22, 33);
+    color: #F5F5F5;
+    box-sizing: border-box;
 }
 
 input:focus { /* поле ввода при фокусе */
-    outline: none; /* Убираем стандартное выделение */
-    border-color: rgb(157, 157, 158); /* Цвет границы при фокусе */
+    outline: none;
+    border-color: rgb(157, 157, 158);
 }
 
 .result { /* результат - это число, которое генерируется */
-    margin-top: 30px; /* Отступ сверху */
-    text-align: center; /* Центрирование текста */
-    font-size: 18px; /* Размер шрифта */
+    margin-top: 30px;
+    text-align: center;
+    font-size: 18px;
 }
 
 .result p { /* параграф - это строка результата */
-    margin: 10px 0; /* Отступы между строками результата */
+    margin: 10px 0;
 }
 
 #price-per-cm,
 #price-per-pizza {
-    font-weight: bold; /* Жирный шрифт */
-    color: #F5F5F5; /* Цвет значений результата */
+    font-weight: bold;
+    color: #F5F5F5;
 }
 
 /* Убираем стрелки для Chrome, Safari, Edge, Opera */
