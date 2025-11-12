@@ -29,7 +29,7 @@
 
 ## Project Structure
 ```
-bot_04_copilot_v2/
+bot_copilot_v2/
 ├── app.py                 # Entry point
 ├── handlers/              # Command handlers
 ├── middlewares/           # Middleware processors
