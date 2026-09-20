@@ -1,14 +1,20 @@
-version: '3.9'
-
 services:
   bot:
     build: .
     container_name: container_bot
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       db:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -35,46 +41,56 @@ services:
       - API_CURRENCY=${API_CURRENCY}
       - DB_POST=${DB_POST}
       - DB_LITE=${DB_LITE}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
     networks:
-      - botnet # Подключение к сети botnet
+      - botnet
+      - backend
     restart: unless-stopped # Автоматический перезапуск контейнера, если он остановится
 
   db:
-    image: postgres:15 # Образ PostgreSQL версии 15
+    image: postgres:15-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f
     container_name: container_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./database/postgres/db:/var/lib/postgresql/data # Сохраняем данные базы данных на локальном диске
-    ports:
-      - "5432:5432"
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - botnet
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   redis:
-    image: redis:7.2-alpine # Образ Redis версии Alpine
+    image: redis:7.2-alpine@sha256:26f9c92117b446e9baee4e4a6e455a4a59a2b50138eef3da4dd32919d4252d0d
     container_name: container_redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data # Сохраняем данные Redis как Docker volume
     networks:
-      - botnet
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 networks:
   botnet:
-    name: botnet    # Принудительно задаем имя сети
-    driver: bridge # Используем драйвер bridge для создания сети
+    name: bot_copilot_net
+    driver: bridge
+  backend:
+    name: bot_copilot_backend
+    driver: bridge
+    internal: true
 
 volumes:
+  postgres_data:
+    driver: local
   redis_data:
     driver: local # Используем локальный драйвер для хранения данных Redis
