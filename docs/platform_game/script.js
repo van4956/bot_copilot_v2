@@ -16,14 +16,7 @@ webapp.MainButton.show();
 
 // Обработчик нажатия на главную кнопку
 webapp.onEvent('mainButtonClicked', function() {
-    // Формируем данные для отправки
-    const gameData = {
-        action: 'game_end',
-        game: 'platform',
-        score: window.game ? window.game.score : 0
-    };
-    // Отправляем данные в Telegram
-    webapp.sendData(JSON.stringify(gameData));
+    if (window.game) window.game.finishGame();
 });
 
 // Подстраиваем тему под настройки пользователя Telegram
@@ -31,12 +24,6 @@ document.documentElement.style.setProperty('--tg-theme-bg-color', webapp.backgro
 document.documentElement.style.setProperty('--tg-theme-text-color', webapp.textColor);
 document.documentElement.style.setProperty('--tg-theme-button-color', webapp.buttonColor);
 document.documentElement.style.setProperty('--tg-theme-button-text-color', webapp.buttonTextColor);
-
-// Отправляем данные о запуске игры
-window.Telegram.WebApp.sendData(JSON.stringify({
-    action: 'game_start',
-    game: 'platform'
-}));
 
 // Инициализируем игру после загрузки DOM
 document.addEventListener('DOMContentLoaded', () => {

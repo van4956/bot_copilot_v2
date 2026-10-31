@@ -1,4 +1,8 @@
 .env
+.env.*.local
+.test-data/
+.tools/
+.ruff_cache/
 .venv
 env/
 venv/
@@ -101,6 +105,8 @@ celerybeat.pid
 
 # SQL dump
 *.sql
+!testing/postgres-app.sql
+!database/migrations/*.sql
 
 # Local configuration files
 *.env

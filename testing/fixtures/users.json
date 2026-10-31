@@ -1,0 +1,962 @@
+[
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 001",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000001,
+    "user_name": "fixture_user_001"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 002",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000002,
+    "user_name": "fixture_user_002"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 003",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000003,
+    "user_name": "fixture_user_003"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 004",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000004,
+    "user_name": "fixture_user_004"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 005",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000005,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 006",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000006,
+    "user_name": "fixture_user_006"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 007",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000007,
+    "user_name": "fixture_user_007"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 008",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000008,
+    "user_name": "fixture_user_008"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 009",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000009,
+    "user_name": "fixture_user_009"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 010",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000010,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 011",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000011,
+    "user_name": "fixture_user_011"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 012",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000012,
+    "user_name": "fixture_user_012"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 013",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000013,
+    "user_name": "fixture_user_013"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 014",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000014,
+    "user_name": "fixture_user_014"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 015",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000015,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 016",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000016,
+    "user_name": "fixture_user_016"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 017",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000017,
+    "user_name": "fixture_user_017"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 018",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000018,
+    "user_name": "fixture_user_018"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 019",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000019,
+    "user_name": "fixture_user_019"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 020",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000020,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 021",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000021,
+    "user_name": "fixture_user_021"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 022",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000022,
+    "user_name": "fixture_user_022"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 023",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000023,
+    "user_name": "fixture_user_023"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 024",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000024,
+    "user_name": "fixture_user_024"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 025",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000025,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 026",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000026,
+    "user_name": "fixture_user_026"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 027",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000027,
+    "user_name": "fixture_user_027"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 028",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000028,
+    "user_name": "fixture_user_028"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 029",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000029,
+    "user_name": "fixture_user_029"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 030",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000030,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 031",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000031,
+    "user_name": "fixture_user_031"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 032",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000032,
+    "user_name": "fixture_user_032"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 033",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000033,
+    "user_name": "fixture_user_033"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 034",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000034,
+    "user_name": "fixture_user_034"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 035",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000035,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 036",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000036,
+    "user_name": "fixture_user_036"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 037",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000037,
+    "user_name": "fixture_user_037"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 038",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000038,
+    "user_name": "fixture_user_038"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 039",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000039,
+    "user_name": "fixture_user_039"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 040",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000040,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 041",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000041,
+    "user_name": "fixture_user_041"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 042",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000042,
+    "user_name": "fixture_user_042"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 043",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000043,
+    "user_name": "fixture_user_043"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 044",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000044,
+    "user_name": "fixture_user_044"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 045",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000045,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 046",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000046,
+    "user_name": "fixture_user_046"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 047",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000047,
+    "user_name": "fixture_user_047"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 048",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000048,
+    "user_name": "fixture_user_048"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 049",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000049,
+    "user_name": "fixture_user_049"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 050",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000050,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 051",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000051,
+    "user_name": "fixture_user_051"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 052",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000052,
+    "user_name": "fixture_user_052"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 053",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000053,
+    "user_name": "fixture_user_053"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 054",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000054,
+    "user_name": "fixture_user_054"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 055",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000055,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 056",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000056,
+    "user_name": "fixture_user_056"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 057",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000057,
+    "user_name": "fixture_user_057"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 058",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000058,
+    "user_name": "fixture_user_058"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 059",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000059,
+    "user_name": "fixture_user_059"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 060",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000060,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 061",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000061,
+    "user_name": "fixture_user_061"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 062",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000062,
+    "user_name": "fixture_user_062"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 063",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000063,
+    "user_name": "fixture_user_063"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 064",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000064,
+    "user_name": "fixture_user_064"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 065",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000065,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 066",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000066,
+    "user_name": "fixture_user_066"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 067",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000067,
+    "user_name": "fixture_user_067"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 068",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000068,
+    "user_name": "fixture_user_068"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 069",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000069,
+    "user_name": "fixture_user_069"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 070",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000070,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 071",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000071,
+    "user_name": "fixture_user_071"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 072",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000072,
+    "user_name": "fixture_user_072"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 073",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000073,
+    "user_name": "fixture_user_073"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 074",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000074,
+    "user_name": "fixture_user_074"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 075",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000075,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 076",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000076,
+    "user_name": "fixture_user_076"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 077",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000077,
+    "user_name": "fixture_user_077"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 078",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000078,
+    "user_name": "fixture_user_078"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 079",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000079,
+    "user_name": "fixture_user_079"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 080",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000080,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 081",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000081,
+    "user_name": "fixture_user_081"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 082",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000082,
+    "user_name": "fixture_user_082"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 083",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000083,
+    "user_name": "fixture_user_083"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 084",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000084,
+    "user_name": "fixture_user_084"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 085",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000085,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 086",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000086,
+    "user_name": "fixture_user_086"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 087",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000087,
+    "user_name": "fixture_user_087"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 088",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000088,
+    "user_name": "fixture_user_088"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 089",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000089,
+    "user_name": "fixture_user_089"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 090",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000090,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 091",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000091,
+    "user_name": "fixture_user_091"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 092",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000092,
+    "user_name": "fixture_user_092"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 093",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000093,
+    "user_name": "fixture_user_093"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 094",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000094,
+    "user_name": "fixture_user_094"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 095",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000095,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 096",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000096,
+    "user_name": "fixture_user_096"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 097",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000097,
+    "user_name": "fixture_user_097"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 098",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000098,
+    "user_name": "fixture_user_098"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 099",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000099,
+    "user_name": "fixture_user_099"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 100",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000100,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 101",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000101,
+    "user_name": "fixture_user_101"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 102",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000102,
+    "user_name": "fixture_user_102"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 103",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000103,
+    "user_name": "fixture_user_103"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 104",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000104,
+    "user_name": "fixture_user_104"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 105",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000105,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 106",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000106,
+    "user_name": "fixture_user_106"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 107",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000107,
+    "user_name": "fixture_user_107"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 108",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000108,
+    "user_name": "fixture_user_108"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 109",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000109,
+    "user_name": "fixture_user_109"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 110",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000110,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 111",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000111,
+    "user_name": "fixture_user_111"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 112",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000112,
+    "user_name": "fixture_user_112"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 113",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000113,
+    "user_name": "fixture_user_113"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 114",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000114,
+    "user_name": "fixture_user_114"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 115",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000115,
+    "user_name": ""
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 116",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000116,
+    "user_name": "fixture_user_116"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 117",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000117,
+    "user_name": "fixture_user_117"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 118",
+    "locale": "en",
+    "status": "member",
+    "user_id": 9000000118,
+    "user_name": "fixture_user_118"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 119",
+    "locale": "ru",
+    "status": "member",
+    "user_id": 9000000119,
+    "user_name": "fixture_user_119"
+  },
+  {
+    "flag": 1,
+    "full_name": "Тестовый пользователь 120",
+    "locale": "en",
+    "status": "kicked",
+    "user_id": 9000000120,
+    "user_name": ""
+  }
+]

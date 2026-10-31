@@ -35,6 +35,9 @@ class SnakeGame {
         this.isStarted = false;
         this.isPaused = false;
         this.gameOver = false;
+        this.timerId = null;
+        this.pendingDirection = null;
+        this.scoreSent = false;
 
         // Цветовая схема
         this.colors = {
@@ -66,13 +69,16 @@ class SnakeGame {
 
     // Метод сброса игры
     reset() {
+        this.stopLoop();
         this.snake = [
             {x: 7, y: 7},
             {x: 6, y: 7},
             {x: 5, y: 7}
         ];
         this.direction = 'right';
+        this.pendingDirection = null;
         this.score = 0;
+        this.scoreSent = false;
         this.gameOver = false;
         this.isPaused = false;
         document.getElementById('score').textContent = '0';
@@ -99,7 +105,9 @@ class SnakeGame {
             // Переключение паузы
             this.isPaused = !this.isPaused;
             this.pauseButton.textContent = this.isPaused ? 'Продолжить' : 'Пауза';
-            if (!this.isPaused) {
+            if (this.isPaused) {
+                this.stopLoop();
+            } else {
                 this.gameLoop();
             }
         }
@@ -120,56 +128,70 @@ class SnakeGame {
                     break;
             }
 
-            switch(e.key) {
-                case 'ArrowUp':    // Если нажата стрелка вверх
-                    if (this.direction !== 'down') this.direction = 'up';
-                    break;
-                case 'ArrowDown':  // Если нажата стрелка вниз
-                    if (this.direction !== 'up') this.direction = 'down';
-                    break;
-                case 'ArrowLeft':  // Если нажата стрелка влево
-                    if (this.direction !== 'right') this.direction = 'left';
-                    break;
-                case 'ArrowRight': // Если нажата стрелка вправо
-                    if (this.direction !== 'left') this.direction = 'right';
-                    break;
-            }
+            const directions = {
+                ArrowUp: 'up', ArrowDown: 'down',
+                ArrowLeft: 'left', ArrowRight: 'right'
+            };
+            if (directions[e.key]) this.changeDirection(directions[e.key]);
         });
 
         // Обработчики нажатий экранных кнопок
         document.getElementById('upButton').addEventListener('click', () => {
-            if (!this.isPaused && this.isStarted && this.direction !== 'down') this.direction = 'up';
+            this.changeDirection('up');
         });
         document.getElementById('downButton').addEventListener('click', () => {
-            if (!this.isPaused && this.isStarted && this.direction !== 'up') this.direction = 'down';
+            this.changeDirection('down');
         });
         document.getElementById('leftButton').addEventListener('click', () => {
-            if (!this.isPaused && this.isStarted && this.direction !== 'right') this.direction = 'left';
+            this.changeDirection('left');
         });
         document.getElementById('rightButton').addEventListener('click', () => {
-            if (!this.isPaused && this.isStarted && this.direction !== 'left') this.direction = 'right';
+            this.changeDirection('right');
         });
     }
 
-    // Метод создания новой еды
-    createFood() {
-        if (this.foods.length < 2) {
-            let newFood;
-            do {
-                newFood = {
-                    x: Math.floor(Math.random() * this.gridSize),
-                    y: Math.floor(Math.random() * this.gridSize)
-                };
-            } while (
-                this.snake.some(segment => segment.x === newFood.x && segment.y === newFood.y) ||
-                this.foods.some(food => food.x === newFood.x && food.y === newFood.y)
-            );
-            this.foods.push(newFood);
+    // Принимаем не больше одного поворота между шагами игры.
+    changeDirection(direction) {
+        if (this.isPaused || !this.isStarted || this.gameOver || this.pendingDirection !== null) return;
+        const opposite = {up: 'down', down: 'up', left: 'right', right: 'left'};
+        if (direction !== this.direction && direction !== opposite[this.direction]) {
+            this.pendingDirection = direction;
         }
     }
-    // console.log("Данные, отправляемые через sendData:", gameData);
+
+    // Выбираем из конечного списка клеток, даже когда поле почти заполнено.
+    createFood() {
+        if (this.foods.length >= 2) return;
+        const freeCells = [];
+        for (let y = 0; y < this.gridSize; y++) {
+            for (let x = 0; x < this.gridSize; x++) {
+                const occupied = this.snake.some(cell => cell.x === x && cell.y === y)
+                    || this.foods.some(cell => cell.x === x && cell.y === y);
+                if (!occupied) freeCells.push({x, y});
+            }
+        }
+        if (freeCells.length > 0) {
+            this.foods.push(freeCells[Math.floor(Math.random() * freeCells.length)]);
+        }
+    }
+
+    stopLoop() {
+        if (this.timerId !== null) clearTimeout(this.timerId);
+        this.timerId = null;
+    }
+
+    finishGame() {
+        if (this.gameOver) return;
+        this.gameOver = true;
+        this.stopLoop();
+        this.pauseButton.textContent = 'Начать';
+        this.sendScore();
+    }
+
     // Этот метод отправляет счет игры в телеграм
     sendScore() {
+        if (this.scoreSent) return;
+        this.scoreSent = true;
         console.log('Sending score:', this.score);
         const gameData = {
             action: 'game_end',
@@ -181,9 +203,11 @@ class SnakeGame {
 
     // Основной игровой цикл
     gameLoop() {
-        if (this.gameOver || this.isPaused || !this.isStarted) return;
+        if (this.gameOver || this.isPaused || !this.isStarted || this.timerId !== null) return;
 
-        setTimeout(() => {
+        this.timerId = setTimeout(() => {
+            this.timerId = null;
+            if (this.gameOver || this.isPaused || !this.isStarted) return;
             this.update();
             this.draw();
             this.gameLoop();
@@ -192,6 +216,10 @@ class SnakeGame {
 
     // Метод обновления состояния игры
     update() {
+        if (this.pendingDirection !== null) {
+            this.direction = this.pendingDirection;
+            this.pendingDirection = null;
+        }
         const head = {x: this.snake[0].x, y: this.snake[0].y};
 
         // Обновляем позицию головы
@@ -206,29 +234,29 @@ class SnakeGame {
         head.x = (head.x + this.gridSize) % this.gridSize;
         head.y = (head.y + this.gridSize) % this.gridSize;
 
-        // Проверяем столкновение с собой
-        if (this.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
-            this.gameOver = true;
-            this.pauseButton.textContent = 'Начать';
-            this.sendScore();
+        const eatenFoodIndex = this.foods.findIndex(food =>
+            food.x === head.x && food.y === head.y
+        );
+        // Хвост освободит клетку на этом шаге, если змейка не растёт.
+        const body = eatenFoodIndex === -1 ? this.snake.slice(0, -1) : this.snake;
+        if (body.some(segment => segment.x === head.x && segment.y === head.y)) {
+            this.finishGame();
             return;
         }
 
         // Добавляем новую голову в начало массива
         this.snake.unshift(head);
 
-        // Проверяем, съела ли змейка один из фруктов
-        const eatenFoodIndex = this.foods.findIndex(food =>
-            food.x === head.x && food.y === head.y
-        );
-
         if (eatenFoodIndex !== -1) {
             // Удаляем съеденный фрукт
             this.foods.splice(eatenFoodIndex, 1);
             this.score += 10;
             document.getElementById('score').textContent = this.score;
-            // Создаем новый фрукт
-            this.createFood();
+            if (this.snake.length === this.gridSize * this.gridSize) {
+                this.finishGame();
+            } else {
+                this.createFood();
+            }
         } else {
             this.snake.pop();
         }

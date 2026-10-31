@@ -1,54 +1,70 @@
-import logging
+"""Ограничение частоты обычных действий без потери платежей."""
 
-# Инициализируем логгер модуля
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.info("Загружен модуль: %s", __name__)
+from collections import OrderedDict
+from time import monotonic
+from typing import Any, Awaitable, Callable
 
-from typing import Any, Awaitable, Callable, Dict
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, CallbackQuery, Message
-from cachetools import TTLCache
+from aiogram.types import (
+    Message,
+    PreCheckoutQuery,
+    ShippingQuery,
+    TelegramObject,
+)
 
-# Создаём кэш для троттлинга
-cache = TTLCache(maxsize=float('inf'),  # неограниченное количество пользователей в кэше
-                 ttl=0.5  # время хранения каждого пользователя в кэше (полсекунды)
-                 )
 
-# Мидлварь для троттлинга (отслеживание чрезмерных действий пользователей)
+def _is_critical_event(event: TelegramObject) -> bool:
+    """Отличает платежи и результаты игр, которые нельзя отбрасывать."""
+    if isinstance(event, (PreCheckoutQuery, ShippingQuery)):
+        return True
+    if getattr(event, "pre_checkout_query", None) is not None:
+        return True
+    if getattr(event, "shipping_query", None) is not None:
+        return True
+    message = getattr(event, "message", None)
+    if isinstance(event, Message):
+        message = event
+    return message is not None and any(
+        getattr(message, field, None) is not None
+        for field in ("successful_payment", "refunded_payment", "web_app_data")
+    )
+
+
 class ThrottleMiddleware(BaseMiddleware):
-    def __init__(self) -> None:
+    """Ограничивает повторы, вызывая следующий обработчик не более раза."""
+
+    def __init__(self, ttl: float = 0.5, max_users: int = 10_000) -> None:
+        """Настраивает окно и ограниченный размер локального кэша."""
         super().__init__()
-        logger.info("class ThrottleMiddleware __init__")
+        self.ttl = ttl
+        self.max_users = max_users
+        self._seen: OrderedDict[int, float] = OrderedDict()
 
-    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]], event: TelegramObject, data: Dict[str, Any]) -> Any:
-        # logger.info("class ThrottleMiddleware __call__")
-        try:
-
-            user_id = None
-
-            # Проверяем, является ли событие сообщением от пользователя
-            if hasattr(event, 'message') and hasattr(event.message, 'from_user'):
-                user_id = event.message.from_user.id
-                # logger.info(f"class ThrottleMiddleware  -  User {user_id} -> Message")
-
-            # Проверяем, является ли событие CallbackQuery (инлайн кнопка) от пользователя
-            if hasattr(event, 'callback_query') and hasattr(event.callback_query, 'from_user'):
-                user_id = event.callback_query.from_user.id
-                # logger.info(f"class ThrottleMiddleware  -  User {user_id} -> CallbackQuery")
-
-            # Если user_id найден и он уже в кэше (значит действие недавно уже выполнялось)
-            if user_id is not None:
-                if cache.get(user_id):
-                    logger.info(f"class ThrottleMiddleware  -  User {user_id} -> throttled ")
-                    return
-
-                # Если пользователь не в кэше, добавляем его туда
-                cache[user_id] = True
-
-            # Передаём управление следующему обработчику
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        """Пропускает платежи и не повторяет упавший обработчик."""
+        if _is_critical_event(event):
             return await handler(event, data)
-
-        except Exception as e:
-            logger.exception("Ошибка в middleware ThrottleMiddleware: %s", str(e))
-            return await handler(event, data)
+        actor = data.get("event_from_user") or getattr(event, "from_user", None)
+        if actor is None:
+            for field in ("message", "callback_query"):
+                actor = getattr(getattr(event, field, None), "from_user", None)
+                if actor is not None:
+                    break
+        if actor is not None:
+            now = monotonic()
+            while self._seen:
+                first_user, first_time = next(iter(self._seen.items()))
+                if now - first_time < self.ttl:
+                    break
+                self._seen.pop(first_user)
+            if actor.id in self._seen:
+                return None
+            self._seen[actor.id] = now
+            while len(self._seen) > self.max_users:
+                self._seen.popitem(last=False)
+        return await handler(event, data)

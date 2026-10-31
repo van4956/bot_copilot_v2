@@ -1,0 +1,42 @@
+[
+  {
+    "author": "Тестовый автор 1",
+    "description": "Искусственное описание тестового рецепта 1.",
+    "image": "test-fixture:1",
+    "price": 10.5,
+    "recipe_id": 9000001,
+    "recipe_name": "Тестовый рецепт 1"
+  },
+  {
+    "author": "Тестовый автор 2",
+    "description": "Искусственное описание тестового рецепта 2.",
+    "image": "test-fixture:2",
+    "price": 21.0,
+    "recipe_id": 9000002,
+    "recipe_name": "Тестовый рецепт 2"
+  },
+  {
+    "author": "Тестовый автор 3",
+    "description": "Искусственное описание тестового рецепта 3.",
+    "image": "test-fixture:3",
+    "price": 31.5,
+    "recipe_id": 9000003,
+    "recipe_name": "Тестовый рецепт 3"
+  },
+  {
+    "author": "Тестовый автор 4",
+    "description": "Искусственное описание тестового рецепта 4.",
+    "image": "test-fixture:4",
+    "price": 42.0,
+    "recipe_id": 9000004,
+    "recipe_name": "Тестовый рецепт 4"
+  },
+  {
+    "author": "Тестовый автор 5",
+    "description": "Искусственное описание тестового рецепта 5.",
+    "image": "test-fixture:5",
+    "price": 52.5,
+    "recipe_id": 9000005,
+    "recipe_name": "Тестовый рецепт 5"
+  }
+]

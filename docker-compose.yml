@@ -29,6 +29,9 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
+      - APP_ENV=production
+      - AUTO_CREATE_SCHEMA=false
+      - DROP_PENDING_UPDATES=false
       - BOT_TOKEN=${BOT_TOKEN}
       - BOT_TOKEN_TEST=${BOT_TOKEN_TEST}
       - OWNER=${OWNER}

@@ -1,112 +1,64 @@
+"""Восстановление языка пользователя для всех типов событий."""
+
 import logging
+from typing import Any, Awaitable, Callable
 
-# Инициализируем логгер модуля
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject, Update
+
+from database.orm_users import SUPPORTED_LOCALES, orm_get_locale
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.info("Загружен модуль: %s", __name__)
-
-from icecream import ic
-ic.configureOutput(includeContext=True, prefix=' >>> Debag >>> ')
-
-from typing import Any
-from aiogram.dispatcher.middlewares.base import BaseMiddleware
-from aiogram.types import TelegramObject
-from database.orm_users import orm_get_locale
 
 
-
-# Функция для получения user_id из различных типов апдейтов
 async def get_user_id(event: TelegramObject) -> int | None:
-    """Определяет user_id из различных типов апдейтов"""
-    # Обычные сообщения
-    if hasattr(event, 'message') and hasattr(event.message, 'from_user'):
-        return event.message.from_user.id
-
-    # Callback Query (нажатия на инлайн-кнопки)
-    elif hasattr(event, 'callback_query') and hasattr(event.callback_query, 'from_user'):
-        return event.callback_query.from_user.id
-
-    # Отредактированные сообщения
-    elif hasattr(event, 'edited_message') and hasattr(event.edited_message, 'from_user'):
-        return event.edited_message.from_user.id
-
-    # Инлайн запросы (когда бота вызывают в других чатах через @)
-    elif hasattr(event, 'inline_query') and hasattr(event.inline_query, 'from_user'):
-        return event.inline_query.from_user.id
-
-    # Выбранные инлайн результаты
-    elif hasattr(event, 'chosen_inline_result') and hasattr(event.chosen_inline_result, 'from_user'):
-        return event.chosen_inline_result.from_user.id
-
-    # Ответы на опросы
-    elif hasattr(event, 'poll_answer') and hasattr(event.poll_answer, 'user'):
-        return event.poll_answer.user.id
-
-    # Запросы на вступление в чат
-    elif hasattr(event, 'chat_join_request') and hasattr(event.chat_join_request, 'from_user'):
-        return event.chat_join_request.from_user.id
-
-    # Изменения в участниках чата
-    elif hasattr(event, 'chat_member') and hasattr(event.chat_member, 'from_user'):
-        return event.chat_member.from_user.id
-
-    # Изменения в моём статусе участника чата
-    elif hasattr(event, 'my_chat_member') and hasattr(event.my_chat_member, 'from_user'):
-        return event.my_chat_member.from_user.id
-
-    # Предварительная проверка счёта (pre_checkout_query)
-    elif hasattr(event, 'pre_checkout_query') and hasattr(event.pre_checkout_query, 'from_user'):
-        return event.pre_checkout_query.from_user.id
-
-    # Запрос отправки счёта (shipping_query)
-    elif hasattr(event, 'shipping_query') and hasattr(event.shipping_query, 'from_user'):
-        return event.shipping_query.from_user.id
-
-    return None
+    """Извлекает пользователя из сообщения, callback и прочих апдейтов."""
+    if isinstance(event, Update):
+        for field in type(event).model_fields:
+            nested = getattr(event, field, None)
+            if isinstance(nested, TelegramObject):
+                user_id = await get_user_id(nested)
+                if user_id is not None:
+                    return user_id
+        return None
+    actor = getattr(event, "from_user", None) or getattr(event, "user", None)
+    return actor.id if actor is not None else None
 
 
-
-# Класс LocaleFromDBMiddleware, наследуемый от BaseMiddleware, предназначен для определеня локали из бд, и передачи ее в FSMContext
 class LocaleFromDBMiddleware(BaseMiddleware):
-    def __init__(self, workflow_data: dict):
+    """Подготавливает локаль, не перехватывая ошибки обработчика."""
+
+    def __init__(self, workflow_data: dict[str, Any]) -> None:
+        """Сохраняет общие зависимости диспетчера."""
         super().__init__()
         self.workflow_data = workflow_data
-        logger.info("class LocaleFromDBMiddleware __init__")
 
-    async def __call__(self, handler, event: TelegramObject, data: dict) -> Any:
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        """Восстанавливает язык в FSM и один раз передаёт событие дальше."""
+        data.setdefault("workflow_data", self.workflow_data)
         try:
-            # Добавляем workflow_data в data
-            if not data.get("workflow_data"):
-                data["workflow_data"] = self.workflow_data
-
-            # Находим локаль в FSM
-            fsm_context = data.get("state")
-            fsm_data = await fsm_context.get_data()
-            current_locale = fsm_data.get("locale")
-
-            # Если локаль уже есть в FSM, передаем обработку дальше
-            if current_locale:
-                return await handler(event, data)
-
-            # Если локаль не найдена, получаем сессию БД
+            state = data.get("state")
             session = data.get("session")
-            if not session:
-                logger.error("Сессия БД не найдена в middleware - LocaleFromDBMiddleware.")
-                return await handler(event, data)
-
-            # Проверяем, является ли событие сообщением от пользователя
-            if hasattr(event, 'message') and hasattr(event.message, 'from_user'):
-                user_id = event.message.from_user.id
-                locale = await orm_get_locale(session, user_id)
-
-                # Если локаль найдена в бд, отправляем ее в FSMContext
-                if locale:
-                    logger.info("Установлена локаль '%s' для пользователя %s", locale, user_id)
-                    await fsm_context.update_data(locale=locale)
-
-            # Передаем обработку дальше
-            return await handler(event, data)
-
-        except Exception as e:
-            logger.error("Ошибка в middleware LocaleFromDBMiddleware: %s", str(e))
-            return await handler(event, data)
+            if state is not None:
+                state_data = await state.get_data()
+                cached_locale = state_data.get("locale")
+                if cached_locale not in SUPPORTED_LOCALES:
+                    if cached_locale is not None:
+                        await state.update_data(locale="ru")
+                    actor = data.get("event_from_user")
+                    user_id = await get_user_id(event)
+                    if actor is not None:
+                        user_id = actor.id
+                    if user_id is not None and session is not None:
+                        user_locale = await orm_get_locale(session, user_id)
+                        if user_locale:
+                            await state.update_data(locale=user_locale)
+        except Exception:
+            logger.exception("Не удалось восстановить язык пользователя")
+        # Исключение downstream не должно повторять его побочные эффекты.
+        return await handler(event, data)

@@ -1,0 +1,91 @@
+name: copilot-review-test
+services:
+  db-test:
+    image: postgres:15-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f
+    environment:
+      POSTGRES_DB: copilot_review_test
+      POSTGRES_USER: review_admin
+      POSTGRES_PASSWORD: ${REVIEW_DB_ADMIN_PASSWORD:?Use .env.test.local}
+      BOT_APP_PASSWORD: ${REVIEW_DB_APP_PASSWORD:?Use .env.test.local}
+    volumes:
+      - review-postgres:/var/lib/postgresql/data
+      - ./testing/postgres-init.sh:/docker-entrypoint-initdb.d/01-app.sh:ro
+      - ./testing/postgres-app.sql:/opt/review-app.sql:ro
+    networks: [review-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U review_admin -d copilot_review_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+  redis-test:
+    image: redis:7.2-alpine@sha256:26f9c92117b446e9baee4e4a6e455a4a59a2b50138eef3da4dd32919d4252d0d
+    networks: [review-backend]
+    volumes: [review-redis:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+  test-runner:
+    build: {context: ., dockerfile: Dockerfile.test}
+    environment:
+      APP_ENV: test
+      BOT_TOKEN_TEST: "123456:OFFLINE_TEST_ONLY"
+      TEST_DATABASE_URL: postgresql+asyncpg://bot_app:${REVIEW_DB_APP_PASSWORD}@db-test:5432/copilot_review_test
+      TEST_REDIS_URL: redis://redis-test:6379/15
+      RUN_INTEGRATION: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: /app
+    depends_on:
+      db-test: {condition: service_healthy}
+      redis-test: {condition: service_healthy}
+    networks: [review-backend]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001
+      - /app/.test-data:uid=10001,gid=10001
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    command: ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]
+    restart: "no"
+  bot-test:
+    profiles: [telegram]
+    build: {context: ., dockerfile: Dockerfile.test}
+    environment:
+      APP_ENV: test
+      BOT_TOKEN_TEST: ${BOT_TOKEN_TEST:?Use .env.test.local}
+      EXPECTED_TEST_BOT_ID: ${EXPECTED_TEST_BOT_ID:?Set the test bot ID}
+      OWNER: ${OWNER:-}
+      ADMIN_LIST: ${ADMIN_LIST:-}
+      WEBAPP_BASE_URL: ${WEBAPP_BASE_URL:-}
+      API_WEATHER: ${API_WEATHER:-}
+      API_CURRENCY: ${API_CURRENCY:-}
+      AUTO_CREATE_SCHEMA: "true"
+      NOTIFY_SERVICE_CHAT: "false"
+      DROP_PENDING_UPDATES: "false"
+      TEST_DATABASE_URL: postgresql+asyncpg://bot_app:${REVIEW_DB_APP_PASSWORD}@db-test:5432/copilot_review_test
+      TEST_REDIS_URL: redis://redis-test:6379/15
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: /app
+    depends_on:
+      db-test: {condition: service_healthy}
+      redis-test: {condition: service_healthy}
+    networks: [review-backend, review-egress]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001
+      - /app/.test-data:uid=10001,gid=10001
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    command: ["python", "app.py"]
+    restart: "no"
+networks:
+  review-backend: {internal: true}
+  review-egress: {}
+volumes:
+  review-postgres: {}
+  review-redis: {}

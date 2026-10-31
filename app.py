@@ -1,192 +1,249 @@
-import logging
-
-# Настраиваем базовую конфигурацию логирования
-# WARNING - самое важное, для прода, для контейнера
-# INFO - подробный, для отладки
-# logging.basicConfig(level=logging.WARNING, format=' - [%(asctime)s] #%(levelname)-5s -  %(name)s:%(lineno)d  -  %(message)s')
-logging.basicConfig(level=logging.WARNING, format=' - [%(asctime)s] #%(levelname)-5s - %(name)s:%(lineno)d  -  %(message)s', datefmt='%y-%m-%d %H:%M:%S')
-logger = logging.getLogger(__name__)
-
-# Настраиваем логгер для SQLAlchemy
-sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
-sqlalchemy_logger.setLevel(logging.INFO)
-sqlalchemy_logger.propagate = True  # Отключаем передачу сообщений основному логгеру, чтобы не задваивать их
-
-from icecream import ic
-ic.configureOutput(includeContext=True, prefix=' >>> Debug >>> ')
+"""Запуск бота без побочных действий при импорте модуля."""
 
 import asyncio
-from datetime import datetime, timezone
+import logging
+from typing import Any
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import Update
-from aiogram.fsm.strategy import FSMStrategy
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.storage.redis import RedisStorage
+import aiohttp
+from aiogram import Bot, Dispatcher, Router, types
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.utils.i18n import ConstI18nMiddleware, I18n, SimpleI18nMiddleware, FSMI18nMiddleware
-from redis.asyncio.client import Redis
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import DefaultKeyBuilder, RedisStorage
+from aiogram.fsm.strategy import FSMStrategy
+from aiogram.utils.i18n import FSMI18nMiddleware, I18n
+from sqlalchemy import inspect
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
-from config_data.config import Config, load_config
-
-from handlers import other, admin, group, start, owner, donate, private, weather, currency, llm, cookbook, miniapp
-from common.comands import private_command, admin_command
+from common.comands import admin_command, private_command
+from config_data.config import ROOT, Config, load_config, validate_test_database
 from database.models import Base
 from middlewares import counter, db, locale, throttle
 
-
-# Режим запуска:
-# docker == 1 - запуск в docker (docker-compose up --build)
-# docker == 0 - запуск локально (python app.py)
-docker = 1
-
-# Загружаем конфиг в переменную config
-config: Config = load_config()
-
-# Инициализируем объект хранилища
-if docker == 1:
-    # Для Docker режима данные хранятся на отдельном сервере Redis
-    storage = RedisStorage(
-        redis=Redis(
-            host=config.redis.host,
-            port=config.redis.port))
-else:
-    # Иначе, данные хранятся в оперативной памяти, при перезапуске всё стирается (для тестов и разработки)
-    storage = MemoryStorage()
-
-# Формируем рабочий токен бота если в Docker режиме, иначе используем тестовый токен
-if docker == 1:
-    token = config.tg_bot.token
-else:
-    token = config.tg_bot.token_test
-
-logger.info('Инициализируем бот и диспетчер')
-bot = Bot(token=token,
-          default=DefaultBotProperties(parse_mode=ParseMode.HTML, # для html тегов в сообщениях
-                                       link_preview=None, # отключаем превью ссылок
-                                       link_preview_is_disabled=None, # отключаем превью ссылок
-                                       link_preview_prefer_large_media=None, # отключаем превью ссылок
-                                       link_preview_prefer_small_media=None, # отключаем превью ссылок
-                                       link_preview_show_above_text=None)) # отключаем превью ссылок
-bot.owner = config.tg_bot.owner
-bot.admin_list = config.tg_bot.admin_list
-bot.home_group = config.tg_bot.home_group
-bot.work_group = config.tg_bot.work_group
-bot.api_gpt = config.tg_bot.api_gpt
-bot.api_weather = config.tg_bot.api_weather
-bot.api_currency = config.tg_bot.api_currency
+logger = logging.getLogger(__name__)
 
 
-dp = Dispatcher(fsm_strategy=FSMStrategy.USER_IN_CHAT, storage=storage)
-# USER_IN_CHAT  -  для каждого юзера, в каждом чате ведется своя запись состояний (это по дефолту)
-# GLOBAL_USER  -  для каждого юзера везде ведется своё состояние
+class GracefulDispatcher(Dispatcher):
+    """Дожидается обработчиков перед закрытием зависимостей FSM и приложения."""
 
-# Создаем движок бд
-if docker == 1: # PostgreSQL
-    engine = create_async_engine(config.db.db_post, echo=False)
-else: # SQLite (для тестов и разработки)
-    engine = create_async_engine(config.db.db_lite, echo=False)
+    def __init__(
+        self, *args: Any, shutdown_timeout: float = 30.0, **kwargs: Any
+    ) -> None:
+        """Настраивает ограниченное ожидание незавершённых обновлений."""
+        super().__init__(*args, **kwargs)
+        self.shutdown_timeout = shutdown_timeout
+        self._active_update_tasks: set[asyncio.Task[Any]] = set()
 
-# Создаем ассинхроную сессию
-session_maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+    async def feed_update(self, bot: Bot, update: types.Update, **kwargs: Any) -> Any:
+        """Учитывает публичную обработку обновления без внутренних полей aiogram."""
+        task = asyncio.current_task()
+        if task is not None:
+            self._active_update_tasks.add(task)
+        try:
+            return await super().feed_update(bot, update, **kwargs)
+        finally:
+            if task is not None:
+                self._active_update_tasks.discard(task)
 
-# Помещаем нужные объекты в workflow_data диспетчера
-some_var_1 = 1
-some_var_2 = 'Some text'
-dp.workflow_data.update({'my_int_var': some_var_1,
-                         'my_text_var': some_var_2})
+    async def drain_updates(self) -> None:
+        """Ждёт активные задачи, затем отменяет и завершает просроченные."""
+        # Задачи, уже созданные polling, должны успеть войти в feed_update.
+        await asyncio.sleep(0)
+        current = asyncio.current_task()
+        tasks = {
+            task
+            for task in self._active_update_tasks
+            if task is not current and not task.done()
+        }
+        if not tasks:
+            return
+        _, pending = await asyncio.wait(tasks, timeout=max(0.0, self.shutdown_timeout))
+        if pending:
+            logger.warning(
+                "Время завершения обработчиков истекло; отменяется задач: %s",
+                len(pending),
+            )
+            for task in pending:
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-# Подключаем мидлвари
-dp.update.outer_middleware(throttle.ThrottleMiddleware())  # тротлинг чрезмерно частых действий пользователей
-dp.update.outer_middleware(counter.CounterMiddleware())  # простой счетчик
-dp.update.outer_middleware(db.DataBaseSession(session_pool=session_maker))  # мидлварь для прокидывания сессии БД
-dp.update.outer_middleware(locale.LocaleFromDBMiddleware(workflow_data=dp.workflow_data))  # определяем локаль из БД и передам ее в FSMContext
-i18n = I18n(path="locales", default_locale="ru", domain="bot_00_template")  # создаем объект I18n
-dp.update.middleware(FSMI18nMiddleware(i18n=i18n))  # получяем язык на каждый апдейт, через обращение к FSMContext
-
-# dp.update.middleware(ConstI18nMiddleware(locale='ru', i18n=i18n))  # задаем локаль как принудительно устанавливаемую константу
-# dp.update.middleware(SimpleI18nMiddleware(i18n=i18n))  # задаем локаль по значению поля "language_code" апдейта
-
-# Подключаем роутеры
-dp.include_router(start.start_router)
-dp.include_router(owner.owner_router)
-dp.include_router(admin.admin_router)
-dp.include_router(private.private_router)
-dp.include_router(weather.weather_router)
-dp.include_router(currency.currency_router)
-dp.include_router(cookbook.cookbook_router)
-# dp.include_router(llm.llm_router)
-dp.include_router(miniapp.miniapp_router)
-dp.include_router(donate.donate_router)
-dp.include_router(group.group_router)
-dp.include_router(other.other_router)
-
-# Логируем все необработанные апдейты
-@dp.update()
-async def log_all_updates(update: Update):
-    logger.info("Необработанный апдейт: %s", update)
-
-# Типы апдейтов которые будем отлавливать ботом
-# ALLOWED_UPDATES = ['message',
-#                     'edited_message',
-#                     'callback_query',
-#                     "web_app_data",
-#                     "chat_member",
-#                     "pre_checkout_query",
-#                     "successful_payment"]  # Отбираем определенные типы апдейтов
-ALLOWED_UPDATES = dp.resolve_used_update_types()  # Отбираем только используемые события по роутерам
-
-# Функция сработает при запуске бота
-async def on_startup():
-    bot_info = await bot.get_me()
-    bot_username = bot_info.username
-    await bot.send_message(chat_id = bot.home_group[0], text = f"🤖 @{bot_username}  -  запущен!")
-
-# Функция сработает при остановке работы бота
-async def on_shutdown():
-    bot_info = await bot.get_me()
-    bot_username = bot_info.username
-    await bot.send_message(chat_id = bot.home_group[0], text = f"☠️ @{bot_username}  -  деактивирован!")
+    async def emit_shutdown(self, *args: Any, **kwargs: Any) -> None:
+        """Завершает обновления раньше штатного закрытия FSM-хранилища."""
+        await self.drain_updates()
+        await super().emit_shutdown(*args, **kwargs)
 
 
+def create_bot(config: Config) -> Bot:
+    """Создаёт клиент без запросов к Telegram."""
+    token = config.tg_bot.token_test if config.test_mode else config.tg_bot.token
+    bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    for name in (
+        "owner",
+        "admin_list",
+        "home_group",
+        "work_group",
+        "api_gpt",
+        "api_weather",
+        "api_currency",
+    ):
+        setattr(bot, name, getattr(config.tg_bot, name))
+    bot.test_mode = config.test_mode
+    bot.notify_service_chat = config.notify_service_chat
+    bot.webapp_base_url = config.webapp_base_url
+    return bot
 
-# Главная функция конфигурирования и запуска бота
-async def main() -> None:
 
-    # Удаление предыдущей версии базы, и создание новых таблиц заново
-    async with engine.begin() as connection:
-        # await connection.run_sync(Base.metadata.drop_all) # удаляем все таблицы
-        await connection.run_sync(Base.metadata.create_all) # создаем все таблицы
+def create_dispatcher(
+    config: Config,
+    sessions: async_sessionmaker[AsyncSession],
+    routers: list[Router] | None = None,
+) -> Dispatcher:
+    """Собирает обработчики и хранилище без сетевых запросов."""
+    storage = (
+        RedisStorage.from_url(
+            config.redis.url,
+            key_builder=DefaultKeyBuilder(prefix=config.redis.prefix),
+        )
+        if config.redis.url
+        else MemoryStorage()
+    )
+    dp = GracefulDispatcher(fsm_strategy=FSMStrategy.USER_IN_CHAT, storage=storage)
+    dp.update.outer_middleware(throttle.ThrottleMiddleware())
+    dp.update.outer_middleware(counter.CounterMiddleware())
+    dp.update.outer_middleware(db.DataBaseSession(session_pool=sessions))
+    dp.update.outer_middleware(
+        locale.LocaleFromDBMiddleware(workflow_data=dp.workflow_data)
+    )
+    i18n = I18n(
+        path=str(ROOT / "locales"),
+        default_locale="ru",
+        domain="bot_00_template",
+    )
+    dp.update.middleware(FSMI18nMiddleware(i18n=i18n))
+    if routers is None:
+        from handlers import (
+            admin,
+            cookbook,
+            currency,
+            donate,
+            group,
+            miniapp,
+            navigation,
+            other,
+            owner,
+            private,
+            start,
+            weather,
+        )
 
-    # Регистрируем функцию, которая будет вызвана автоматически при запуске/остановке бота
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
+        routers = [
+            donate.payment_router,
+            miniapp.webapp_data_router,
+            navigation.navigation_router,
+            start.start_router,
+            owner.owner_router,
+            admin.admin_router,
+            private.private_router,
+            donate.donate_router,
+            weather.weather_router,
+            currency.currency_router,
+            cookbook.cookbook_router,
+            miniapp.miniapp_router,
+            group.group_router,
+            other.other_router,
+        ]
+    for router in routers:
+        dp.include_router(router)
+    return dp
 
-    # Пропускаем накопившиеся апдейты - удаляем вебхуки (то что бот получил пока спал)
-    await bot.delete_webhook(drop_pending_updates=True)
 
-    # Удаляем ранее установленные команды для бота во всех личных чатах
-    await bot.delete_my_commands(scope=types.BotCommandScopeAllPrivateChats())
-
-    # Добавляем свои команды
-    await bot.set_my_commands(commands=private_command, scope=types.BotCommandScopeAllPrivateChats())
-
-    # Добавляем команды для админов
-    for admin_id in bot.admin_list:
-        await bot.set_my_commands(commands=admin_command, scope=types.BotCommandScopeChat(chat_id=admin_id))
-
-    # Запускаем polling
+async def notify_service(bot: Bot, config: Config, text: str) -> None:
+    """Отправляет необязательное уведомление без остановки приложения."""
+    if not config.notify_service_chat or not config.tg_bot.home_group:
+        return
     try:
-        await dp.start_polling(bot,
-                               allowed_updates=ALLOWED_UPDATES,
-                               polling_timeout=60)
-                            #    skip_updates=False)  # Если бот будет обрабатывать платежи, НЕ пропускаем обновления!
-    finally:
-        await bot.session.close()
+        await bot.send_message(config.tg_bot.home_group[0], text)
+    except Exception:
+        logger.warning("Не удалось отправить служебное уведомление")
 
+
+async def main(config: Config | None = None) -> None:
+    """Запускает выбранную среду и освобождает подключения при любой ошибке."""
+    config = config or load_config()
+    bot = create_bot(config)
+    engine = None
+    dp = None
+    try:
+        if config.test_mode:
+            validate_test_database(config.database_url)
+            url = make_url(config.database_url)
+            if url.drivername.startswith("sqlite") and url.database != ":memory:":
+                from pathlib import Path
+
+                Path(url.database).parent.mkdir(parents=True, exist_ok=True)
+        engine = create_async_engine(config.database_url, echo=False)
+        sessions = async_sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
+        dp = create_dispatcher(config, sessions)
+        async with engine.begin() as connection:
+            if config.create_schema:
+                await connection.run_sync(Base.metadata.create_all)
+            else:
+                tables = await connection.run_sync(
+                    lambda conn: set(inspect(conn).get_table_names())
+                )
+                if not set(Base.metadata.tables).issubset(tables):
+                    raise RuntimeError(
+                        "Схема БД не готова: примените проверенную миграцию"
+                    )
+        async with aiohttp.ClientSession() as http:
+            bot.http_session = http
+            identity = await bot.get_me()
+            if config.test_mode:
+                if (identity.username or "").casefold() == "terminatorvan_bot":
+                    raise RuntimeError("Отказ запуска тестов на основном боте")
+                if (
+                    config.expected_test_bot_id
+                    and identity.id != config.expected_test_bot_id
+                ):
+                    raise RuntimeError("ID тестового бота не совпадает")
+            await bot.delete_webhook(drop_pending_updates=config.drop_pending_updates)
+            await bot.set_my_commands(
+                private_command, scope=types.BotCommandScopeAllPrivateChats()
+            )
+            for admin_id in config.tg_bot.admin_list:
+                await bot.set_my_commands(
+                    admin_command,
+                    scope=types.BotCommandScopeChat(chat_id=admin_id),
+                )
+            await notify_service(bot, config, "🤖 Бот запущен")
+            try:
+                await dp.start_polling(
+                    bot,
+                    allowed_updates=dp.resolve_used_update_types(),
+                    polling_timeout=60,
+                    close_bot_session=False,
+                )
+            finally:
+                await notify_service(bot, config, "Бот остановлен")
+    finally:
+        try:
+            if dp is not None:
+                await dp.storage.close()
+        finally:
+            try:
+                if engine is not None:
+                    await engine.dispose()
+            finally:
+                await bot.session.close()
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.WARNING)
     asyncio.run(main())

@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt requirements-test.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-test.txt
+COPY . .
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
+USER 10001:10001
+CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"]

@@ -1,64 +1,64 @@
-import logging
+"""Операции с рецептами без изменения их постоянных идентификаторов."""
 
-# Инициализируем логгер модуля
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.info("Загружен модуль: %s", __name__)
+from typing import Any
 
-from sqlalchemy import delete, select, text, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Cookbook
 
-# добавляем рецепт в орм
-async def orm_add_recipe(session: AsyncSession, data: dict):
-    # создаем объект Product, передаем ему данные из data
-    obj = Cookbook(recipe_name=data["recipe_name"],
-                  author=data["author"],
-                  description=data["description"],
-                  price=float(data["price"]),
-                  image=data["image"],)
-    session.add(obj) # добавляем объект Product в сессию
-    await session.commit() # закрепляем данные в базе данных
 
-# получаем все рецепты находящиеся в бд
-async def orm_get_recipes(session: AsyncSession):
-    query = select(Cookbook)
-    result = await session.execute(query)
-    return result.scalars().all()
+def _recipe_values(data: dict[str, Any]) -> dict[str, Any]:
+    """Выбирает поля рецепта из пользовательского состояния."""
+    return {
+        "recipe_name": data["recipe_name"],
+        "author": data["author"],
+        "description": data["description"],
+        "price": float(data["price"]),
+        "image": data["image"],
+    }
 
-# получаем определенный рецепт по его id
-async def orm_get_recipe(session: AsyncSession, recipe_id: int):
-    query = select(Cookbook).where(Cookbook.recipe_id == recipe_id)
-    result = await session.execute(query)
-    return result.scalar()
 
-# изменение определенного рецепта
-async def orm_update_recipe(session: AsyncSession, recipe_id: int, data):
-    query = update(Cookbook).where(Cookbook.recipe_id == recipe_id).values(
-        recipe_name=data["recipe_name"],
-        author=data["author"],
-        description=data["description"],
-        price=float(data["price"]),
-        image=data["image"],)
-    await session.execute(query)
+async def orm_add_recipe(
+    session: AsyncSession, data: dict[str, Any]
+) -> Cookbook:
+    """Добавляет рецепт и возвращает созданный объект."""
+    recipe = Cookbook(**_recipe_values(data))
+    session.add(recipe)
     await session.commit()
+    return recipe
 
-# переупорядочивание ID рецептов
-async def reorder_recipe_ids(session: AsyncSession):
-    # Получаем все рецепты, отсортированные по ID
-    query = select(Cookbook).order_by(Cookbook.recipe_id)
-    recipes = (await session.execute(query)).scalars().all()
 
-    # Обновляем ID для каждого рецепта последовательно
-    for new_id, recipe in enumerate(recipes, start=1):
-        recipe.recipe_id = new_id
+async def orm_get_recipes(session: AsyncSession) -> list[Cookbook]:
+    """Возвращает рецепты в устойчивом порядке."""
+    result = await session.execute(select(Cookbook).order_by(Cookbook.recipe_id))
+    return list(result.scalars().all())
 
+
+async def orm_get_recipe(
+    session: AsyncSession, recipe_id: int
+) -> Cookbook | None:
+    """Возвращает рецепт по постоянному идентификатору."""
+    return await session.get(Cookbook, recipe_id)
+
+
+async def orm_update_recipe(
+    session: AsyncSession, recipe_id: int, data: dict[str, Any]
+) -> bool:
+    """Обновляет существующий рецепт без создания нового вместо удалённого."""
+    result = await session.execute(
+        update(Cookbook)
+        .where(Cookbook.recipe_id == recipe_id)
+        .values(**_recipe_values(data))
+    )
     await session.commit()
+    return result.rowcount > 0
 
-# удаляем определенный рецепт
-async def orm_delete_recipe(session: AsyncSession, recipe_id: int):
-    query = delete(Cookbook).where(Cookbook.recipe_id == recipe_id)
-    await session.execute(query)
+
+async def orm_delete_recipe(session: AsyncSession, recipe_id: int) -> bool:
+    """Удаляет рецепт, сохраняя идентификаторы остальных рецептов."""
+    result = await session.execute(
+        delete(Cookbook).where(Cookbook.recipe_id == recipe_id)
+    )
     await session.commit()
-    await reorder_recipe_ids(session)
+    return result.rowcount > 0

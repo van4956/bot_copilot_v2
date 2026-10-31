@@ -42,6 +42,8 @@ class PlatformGame {
         this.isStarted = false;
         this.isPaused = false;
         this.gameOver = false;
+        this.animationFrameId = null;
+        this.scoreSent = false;
 
         // Цветовая схема (как в змейке)
         this.colors = {
@@ -87,12 +89,16 @@ class PlatformGame {
 
     // Метод сброса игры
     reset() {
+        this.stopLoop();
         this.paddleX = (this.canvas.width - this.paddleWidth) / 2;
         this.ballX = this.canvas.width / 2;
         this.ballY = this.canvas.height - 30;
-        this.ballSpeedX = 1;
-        this.ballSpeedY = -1;
+        this.ballSpeedX = 1.3;
+        this.ballSpeedY = -1.3;
         this.score = 0;
+        this.scoreSent = false;
+        this.rightPressed = false;
+        this.leftPressed = false;
         this.gameOver = false;
         this.isPaused = false;
         this.initBlocks();
@@ -113,7 +119,9 @@ class PlatformGame {
         } else {
             this.isPaused = !this.isPaused;
             this.pauseButton.textContent = this.isPaused ? 'Продолжить' : 'Пауза';
-            if (!this.isPaused) {
+            if (this.isPaused) {
+                this.stopLoop();
+            } else {
                 this.gameLoop();
             }
         }
@@ -186,9 +194,7 @@ class PlatformGame {
 
                         // Проверка победы
                         if(this.score === this.blockRows * this.blockColumns * 10) {
-                            this.gameOver = true;
-                            this.pauseButton.textContent = 'Начать';
-                            this.sendScore();
+                            this.finishGame();
                         }
                     }
                 }
@@ -198,6 +204,8 @@ class PlatformGame {
 
     // Отправка счета в Telegram
     sendScore() {
+        if (this.scoreSent) return;
+        this.scoreSent = true;
         console.log('Sending score:', this.score);
         const gameData = {
             action: 'game_end',
@@ -207,14 +215,30 @@ class PlatformGame {
         window.Telegram.WebApp.sendData(JSON.stringify(gameData));
     }
 
-    // Основной игровой цикл
+    stopLoop() {
+        if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+    }
+
+    finishGame() {
+        if (this.gameOver) return;
+        this.gameOver = true;
+        this.stopLoop();
+        this.pauseButton.textContent = 'Начать';
+        this.sendScore();
+    }
+
+    // Планируем только один кадр и отменяем его при паузе.
     gameLoop() {
-        if (this.gameOver || this.isPaused || !this.isStarted) return;
+        if (this.gameOver || this.isPaused || !this.isStarted || this.animationFrameId !== null) return;
 
-        this.update();
-        this.draw();
-
-        requestAnimationFrame(() => this.gameLoop());
+        this.animationFrameId = requestAnimationFrame(() => {
+            this.animationFrameId = null;
+            if (this.gameOver || this.isPaused || !this.isStarted) return;
+            this.update();
+            this.draw();
+            this.gameLoop();
+        });
     }
 
     // Обновление состояния игры
@@ -251,9 +275,8 @@ class PlatformGame {
             }
             else if(this.ballY > this.canvas.height) {
                 // Мяч упал - игра окончена
-                this.gameOver = true;
-                this.pauseButton.textContent = 'Начать';
-                this.sendScore();
+                this.finishGame();
+                return;
             }
         }
 

@@ -1,224 +1,284 @@
-import asyncio
+"""Донаты Telegram Stars с проверкой счетов и устойчивым учётом."""
+
 import logging
+from html import escape
 
-# Инициализируем логгер модуля
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logger.info("Загружен модуль: %s", __name__)
-
-from datetime import datetime
-from aiogram import Router, F, Bot
-from aiogram.fsm.context import FSMContext
+from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandObject
+from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, LabeledPrice, PreCheckoutQuery, CallbackQuery, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import (
+    CallbackQuery,
+    LabeledPrice,
+    Message,
+    PreCheckoutQuery,
+)
 from aiogram.utils.i18n import gettext as _
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
+from database.orm_payments import (
+    MAX_DONATION,
+    MIN_DONATION,
+    PAYMENT_CURRENCY,
+    orm_create_invoice,
+    orm_get_invoice,
+    orm_get_payment,
+    orm_mark_refunded,
+    orm_record_payment,
+    validate_invoice,
+)
 
-
-# Инициализируем роутер уровня модуля
+logger = logging.getLogger(__name__)
+payment_router = Router()
+payment_router.message.filter(F.chat.type == "private")
 donate_router = Router()
-
-# Фильтрация сообщений для обработки только в приватных чатах
 donate_router.message.filter(F.chat.type == "private")
 
-# Определение класс состояний для валюты
+
 class Donate(StatesGroup):
-    """Класс состояний для доната"""
+    """Состояния интерфейса, не определяющие обработку платежей."""
+
     donate_input = State()
     donate_input_x = State()
     donate_send = State()
 
-# Условие для возврата: возврат возможен только в течение 30 дней после доната
-REFUND_PERIOD_DAYS = 30
+
+def _donation_keyboard() -> InlineKeyboardBuilder:
+    """Создаёт клавиатуру выбора суммы."""
+    builder = InlineKeyboardBuilder()
+    for amount in (10, 50, 100):
+        builder.button(text=f"{amount} ⭐️", callback_data=f"donate_{amount}")
+    builder.button(text=_("другое"), callback_data="donate_x")
+    builder.button(text=_("Назад на главную ↩️"), callback_data="donate_back")
+    builder.adjust(2, 2, 1)
+    return builder
+
+
+async def _send_invoice(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    user_id: int,
+    amount: int,
+) -> None:
+    """Выдаёт счёт, параметры которого уже сохранены в БД."""
+    invoice = await orm_create_invoice(session, user_id, amount)
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"{amount} XTR", pay=True)
+    builder.button(text=_("Отменить"), callback_data="donate_cancel")
+    builder.adjust(1)
+    await message.answer_invoice(
+        title=_("Поддержать автора донатом"),
+        description=_("На сумму"),
+        prices=[LabeledPrice(label=PAYMENT_CURRENCY, amount=amount)],
+        provider_token="",
+        payload=invoice.invoice_payload,
+        currency=PAYMENT_CURRENCY,
+        reply_markup=builder.as_markup(),
+    )
+    await state.update_data(donate_amount=amount)
+    await state.set_state(Donate.donate_send)
 
 
 @donate_router.message(Command("donate"))
-async def cmd_donate(message: Message, state: FSMContext):
-    # await message.answer(text=_('Поддержать автора донатом'), reply_markup=keyboard.del_kb)
-    builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="10 ⭐️",callback_data="donate_10"))
-    builder.row(InlineKeyboardButton(text="50 ⭐️",callback_data="donate_50"))
-    builder.row(InlineKeyboardButton(text="100 ⭐️", callback_data="donate_100"))
-    builder.row(InlineKeyboardButton(text=_("другое"),callback_data="donate_x"))
-    builder.row(InlineKeyboardButton(text=_("Назад на главную ↩️"), callback_data='donate_back'))
-    msg = await message.answer(text=_("Поддержать автора донатом"), reply_markup=builder.adjust(2,2,1).as_markup())
+async def cmd_donate(message: Message, state: FSMContext) -> None:
+    """Открывает выбор суммы доната."""
+    await message.answer(
+        _("Поддержать автора донатом"),
+        reply_markup=_donation_keyboard().as_markup(),
+    )
     await state.set_state(Donate.donate_input)
 
-    # Сохраняем message_id в FSMContext
-    await state.update_data(last_message_id=msg.message_id)
 
-
-# обработка инлайн кнопки "Поддержать"
 @donate_router.callback_query(F.data == "donate")
-async def callback_donate(callback: CallbackQuery, state: FSMContext):
-    await callback.message.delete()
-    builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="10 ⭐️",callback_data="donate_10"))
-    builder.row(InlineKeyboardButton(text="50 ⭐️",callback_data="donate_50"))
-    builder.row(InlineKeyboardButton(text="100 ⭐️", callback_data="donate_100"))
-    builder.row(InlineKeyboardButton(text=_("другое"),callback_data="donate_x"))
-    builder.row(InlineKeyboardButton(text=_("Назад на главную ↩️"), callback_data='donate_back'))
-    msg = await callback.message.answer(text=_("Поддержать автора донатом"), reply_markup=builder.adjust(2,2,1).as_markup())
-    await state.set_state(Donate.donate_input)
-
-    # Сохраняем message_id в FSMContext
-    await state.update_data(last_message_id=msg.message_id)
+async def callback_donate(callback: CallbackQuery, state: FSMContext) -> None:
+    """Открывает донаты по кнопке меню."""
+    if isinstance(callback.message, Message):
+        await cmd_donate(callback.message, state)
+    await callback.answer()
 
 
-@donate_router.callback_query(Donate.donate_input, F.data.startswith("donate_"))
-async def cmd_donate_input(callback: CallbackQuery, state: FSMContext):
-    data = callback.data.split("_")[1]
-
-    if data == 'back':
-        await state.clear()
-        await callback.message.edit_text(text=_("Поддержать автора донатом"), reply_markup=None)
-        await callback.answer(_('Назад на главную'))
-        await asyncio.sleep(1)
-        await callback.message.answer(_('Главная панель'), reply_markup=keyboard.start_keyboard())
-
-
-    elif data == 'x':
-        # await callback.message.edit_text(text="Поддержать автора донатом", reply_markup=None)
-        await callback.message.delete()
-        await callback.message.answer(text=_('Введите произвольную сумму доната, от 1 до 2500 ⭐️'), reply_markup=keyboard.del_kb)
+@donate_router.callback_query(
+    Donate.donate_input, F.data.startswith("donate_")
+)
+async def cmd_donate_input(
+    callback: CallbackQuery, state: FSMContext, session: AsyncSession
+) -> None:
+    """Проверяет выбранную сумму до создания счёта."""
+    if not isinstance(callback.message, Message):
+        await callback.answer(_("Сообщение больше недоступно"))
+        return
+    choice = (callback.data or "").removeprefix("donate_")
+    if choice == "back":
+        # Язык и остальные пользовательские настройки не удаляем.
+        await state.set_state(None)
+        await state.update_data(donate_amount=None)
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.answer(
+            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+        )
+    elif choice == "x":
+        await callback.message.answer(
+            _("Введите произвольную сумму доната, от 1 до 2500 ⭐️"),
+            reply_markup=keyboard.del_kb,
+        )
         await state.set_state(Donate.donate_input_x)
-
+    elif choice in {"10", "50", "100"}:
+        await _send_invoice(
+            callback.message,
+            state,
+            session,
+            callback.from_user.id,
+            int(choice),
+        )
     else:
-        amount = int(data)
-        await state.update_data(donate_amount=amount)
-        await callback.message.delete()
+        await callback.answer(_("Выберите сумму кнопками меню"))
+        return
+    await callback.answer()
 
-        # Формируем клавиатуру с кнопками для оплаты и отмены операции
-        kb = InlineKeyboardBuilder()
-        kb.button(text=_("{amount} XTR").format(amount=amount), pay=True)  # pay=True важный параметр, указывающий что кнопка предназначена для оплаты
-        kb.button(text=_("Отменить"), callback_data="donate_cancel")
-        kb.adjust(1)
 
-        # Формируем инвойс для оплаты
-        prices = [LabeledPrice(label="XTR", amount=amount)]
-        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        msg = await callback.message.answer_invoice(title=_("Поддержать автора донатом"),
-                                                description=_("На сумму"),
-                                                prices=prices,
-                                                provider_token="",
-                                                payload=timestamp,  # Добавляем временную метку в payload
-                                                currency="XTR",
-                                                reply_markup=kb.as_markup()
-                                            )
-        # Сохраняем message_id в FSMContext
-        await state.update_data(last_message_id=msg.message_id)
+@payment_router.pre_checkout_query()
+async def pre_checkout_query(
+    query: PreCheckoutQuery, session: AsyncSession
+) -> None:
+    """Проверяет счёт независимо от текущего состояния диалога."""
+    try:
+        invoice = await orm_get_invoice(session, query.invoice_payload)
+        validate_invoice(
+            invoice, query.from_user.id, query.currency, query.total_amount
+        )
+        if invoice is None or invoice.status != "pending":
+            raise ValueError("Счёт уже обработан")
+    except ValueError:
+        await query.answer(
+            ok=False,
+            error_message=_("Счёт недействителен. Создайте новый донат."),
+        )
+    except Exception:
+        logger.exception("Не удалось проверить счёт")
+        await query.answer(
+            ok=False,
+            error_message=_("Не удалось проверить счёт. Попробуйте позже."),
+        )
+    else:
+        await query.answer(ok=True)
 
-        await state.set_state(Donate.donate_send)
+
+# Подтверждение оплаты важнее любых диалоговых состояний ввода.
+@payment_router.message(F.successful_payment)
+async def on_successfull_payment(
+    message: Message, session: AsyncSession, state: FSMContext
+) -> None:
+    """Сохраняет транзакцию один раз, даже после выхода на главную."""
+    payment = message.successful_payment
+    if payment is None or message.from_user is None:
+        return
+    try:
+        payment_record, created = await orm_record_payment(
+            session,
+            payment.invoice_payload,
+            message.from_user.id,
+            payment.currency,
+            payment.total_amount,
+            payment.telegram_payment_charge_id,
+        )
+    except ValueError:
+        logger.exception("Платёж не соответствует выданному счёту")
+        await message.answer(
+            _("Не удалось сверить платёж. Обратитесь к автору бота.")
+        )
+        return
+    if not created:
+        return
+    if await state.get_state() == Donate.donate_send.state:
+        await state.set_state(None)
+        await state.update_data(donate_amount=None)
+    await message.answer(
+        _("<b>Спасибо!</b>\nВаш донат успешно принят.\n\n"
+          "ID транзакции:\n<code>{t_id}</code>").format(
+              t_id=escape(payment_record.telegram_payment_charge_id or "")
+          )
+    )
+
+
+@payment_router.message(Command("refund"))
+async def command_refund_handler(
+    message: Message, bot: Bot, command: CommandObject, session: AsyncSession
+) -> None:
+    """Передаёт запрос возврата собственного подтверждённого доната."""
+    charge_id = (command.args or "").strip()
+    if (
+        not charge_id
+        or len(charge_id) > 255
+        or any(char.isspace() for char in charge_id)
+    ):
+        await message.answer(_("Укажите ID транзакции: /refund ID"))
+        return
+    payment = await orm_get_payment(session, charge_id)
+    if payment is None or payment.user_id != message.from_user.id:
+        await message.answer(_("Платёж с таким ID для вас не найден."))
+        return
+    if payment.status == "refunded":
+        await message.answer(_("Этот донат уже возвращён."))
+        return
+    if payment.status != "paid":
+        await message.answer(_("Платёж ещё не подтверждён."))
+        return
+    try:
+        confirmed = await bot.refund_star_payment(
+            user_id=message.from_user.id, telegram_payment_charge_id=charge_id
+        )
+    except TelegramAPIError:
+        logger.exception("Telegram не подтвердил возврат доната")
+        await message.answer(
+            _("Не удалось подтвердить возврат. Попробуйте позже.")
+        )
+        return
+    if not confirmed:
+        await message.answer(_("Telegram не подтвердил возврат доната."))
+        return
+    try:
+        await orm_mark_refunded(session, charge_id)
+    except Exception:
+        logger.exception("Возврат подтверждён, но его статус не сохранён")
+        await message.answer(_(
+            "Telegram подтвердил возврат, но локальный статус не сохранён. "
+            "Обратитесь к автору бота."
+        ))
+        return
+    await message.answer(_("Донат успешно возвращён."))
 
 
 @donate_router.message(Donate.donate_input_x)
-async def cmd_donate_input_x(message: Message,  state: FSMContext):
-    text = message.text
-    if text.isdigit() and 1 <= int(text) <= 2500: # type: ignore
-        amount = int(text) # type: ignore
-        await state.update_data(donate_amount=amount)
-        await message.delete()
-
-        # Формируем клавиатуру с кнопками для оплаты и отмены операции
-        kb = InlineKeyboardBuilder()
-        kb.button(text=_("{amount} XTR").format(amount=amount), pay=True)  # pay=True важный параметр, указывающий что кнопка предназначена для оплаты
-        kb.button(text=_("Отменить"), callback_data="donate_cancel")
-        kb.adjust(1)
-
-        # Формируем инвойс для оплаты
-        prices = [LabeledPrice(label="XTR", amount=amount)]
-        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        msg = await message.answer_invoice(title=_("Поддержать автора донатом"),
-                                    description=_("На сумму"),
-                                    prices=prices,
-                                    provider_token="",
-                                    payload=timestamp,  # Добавляем временную метку в payload
-                                    currency="XTR",
-                                    reply_markup=kb.as_markup()
-                                    )
-        # Сохраняем message_id в FSMContext
-        await state.update_data(last_message_id=msg.message_id)
-
-        await state.set_state(Donate.donate_send)
-
+async def cmd_donate_input_x(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    """Проверяет произвольную сумму, включая нетекстовый ввод."""
+    text = (message.text or "").strip()
+    if not text.isascii() or not text.isdecimal() or len(text) > 4:
+        amount = 0
     else:
-        await message.answer(text=_('Telegram может принять донат только в диапазоне от 1 до 2500 ⭐️.\n\nВведите любое целое число из данного диапазона.'),
-                             reply_markup=keyboard.del_kb)
+        amount = int(text)
+    if not MIN_DONATION <= amount <= MAX_DONATION:
+        await message.answer(
+            _("Введите целое число от 1 до 2500 ⭐️."),
+            reply_markup=keyboard.del_kb,
+        )
+        return
+    await _send_invoice(message, state, session, message.from_user.id, amount)
 
 
-# Обработка отмены доната, выводим сообщение об отмене и удаляем сообщение
 @donate_router.callback_query(Donate.donate_send, F.data == "donate_cancel")
-async def on_donate_cancel(callback: CallbackQuery, state: FSMContext):
-    await callback.answer(_("😢 Донат отменен."))
-    await callback.message.delete()
+async def on_donate_cancel(callback: CallbackQuery, state: FSMContext) -> None:
+    """Закрывает интерфейс оплаты, сохраняя язык пользователя."""
     await state.set_state(None)
     await state.update_data(donate_amount=None)
-    await callback.message.answer(_('Главная панель'), reply_markup=keyboard.start_keyboard())
-
-@donate_router.message(Command('refund'))
-async def command_refund_handler(message: Message, bot: Bot, command: CommandObject) -> None:
-    transaction_id = command.args if command.args else ''
-    user_id = message.from_user.id
-    try:
-        await bot.refund_star_payment(user_id=user_id, telegram_payment_charge_id=transaction_id)
-    except Exception as e:
-        logger.error("Ошибка: %s", str(e))
-
-
-# Проверка перед оплатой, бот должен ответить в течение 10 секунд
-@donate_router.pre_checkout_query(Donate.donate_send)
-async def pre_checkout_query(query: PreCheckoutQuery):
-    # Мы всегда отвечаем положительно, так как это просто донат
-    await query.answer(ok=True)
-
-    # Если по какой-то причине нужно отказать в проведении платежа, можно использовать:
-    # Добавляем условие для проверки ..
-    # await query.answer(ok=False, error_message="Причина отказа в проведении платежа")
-
-
-# Обработка успешного платежа
-@donate_router.message(Donate.donate_send, F.successful_payment)
-async def on_successfull_payment(message: Message, state: FSMContext, workflow_data: dict):
-    # Получаем объект message.successful_payment
-    t_id = message.successful_payment.telegram_payment_charge_id  # ID транзакции
-    invoice_payload = message.successful_payment.invoice_payload  # payload который мы установили ранее, там временная метка
-    user_id = message.from_user.id
-
-    data = await state.get_data()
-    donate_info = data.get('donate_info') or {}
-    donate_info[t_id] = invoice_payload
-    # print('donate_info: ', donate_info)
-    await state.update_data(donate_info=donate_info)
-
-    last_message_id = data.get('last_message_id')
-
-    # Если есть предыдущее сообщение, удаляем его
-    if last_message_id:
-        try:
-            await message.bot.delete_message(chat_id=user_id,
-                                message_id=last_message_id)
-        except Exception as e:
-            logger.error("Ошибка при удалении last_message_id сообщения: %s", e)
-
-
-    await message.answer(
-        text=_("<b>Спасибо!</b>\n"
-               "Ваш донат успешно принят.\n\n"
-                "ID транзакции:\n<code>{t_id}</code>").format(t_id=t_id),
-        message_effect_id="5104841245755180586"
-    )
-        # другие реакции (если надо)
-        # 🔥 огонь - 5104841245755180586
-        # 👍 лайк - 5107584321108051014
-        # 👎 дизлайк - 5104858069142078462
-        # ❤️ сердечко - 5159385139981059251
-        # 🎉 праздник - 5046509860389126442
-        # 💩 какаха - 5046589136895476101
-
-    await state.set_state(None)
-    await state.update_data(donate_amount=None, donate_info=None)
-
-    await message.answer(_('Главная панель'), reply_markup=keyboard.start_keyboard())
+    if isinstance(callback.message, Message):
+        await callback.message.delete()
+        await callback.message.answer(
+            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+        )
+    await callback.answer(_("Донат отменён."))

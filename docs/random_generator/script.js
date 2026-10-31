@@ -41,9 +41,14 @@ function animateNumber(from, to, duration = 2000) {
 }
 
 // Функция генерации случайного числа
+function parseBound(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isSafeInteger(parsed) ? parsed : fallback;
+}
+
 function generateNumber() {
-    const min = parseInt(minInput.value) || 1; // Получаем минимальное значение (или 1, если ввод некорректный)
-    const max = parseInt(maxInput.value) || 100; // Получаем максимальное значение (или 100, если ввод некорректный)
+    const min = parseBound(minInput.value, 1);
+    const max = parseBound(maxInput.value, 100);
 
     const validMin = Math.min(min, max);
     const validMax = Math.max(min, max);
@@ -57,16 +62,16 @@ function generateNumber() {
 
 // Обработчики событий при вводе значений
 minInput.addEventListener('input', () => {
-    const min = parseInt(minInput.value) || 1;
-    const max = parseInt(maxInput.value) || 100;
+    const min = parseBound(minInput.value, 1);
+    const max = parseBound(maxInput.value, 100);
     if (min > max) {
         maxInput.value = min;
     }
 });
 
 maxInput.addEventListener('input', () => { // При изменении максимального значения
-    const min = parseInt(minInput.value) || 1;
-    const max = parseInt(maxInput.value) || 100;
+    const min = parseBound(minInput.value, 1);
+    const max = parseBound(maxInput.value, 100);
     if (max < min) {
         minInput.value = max;
     }

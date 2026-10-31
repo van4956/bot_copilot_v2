@@ -22,6 +22,14 @@ wheels/
 
 # Environments and configs
 .env
+.env.*.local
+.test-data/
+.tools/
+.ruff_cache/
+*.db
+*.sqlite
+*.sqlite3
+*.sql
 .venv
 env/
 venv/
