@@ -1,10 +1,13 @@
 """Асинхронный конвертер валют с проверкой ответа сервиса."""
 
+import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 import aiohttp
 from aiogram import F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -38,6 +41,8 @@ CURRENCIES = {
 }
 markup_cur = keyboard.get_callback_btns(btns=CURRENCIES, sizes=(3, 3, 3, 3))
 CURRENCY_CODES = frozenset(CURRENCIES.values())
+MAX_AMOUNT_LENGTH = 18
+logger = logging.getLogger(__name__)
 
 
 class Currency(StatesGroup):
@@ -46,6 +51,48 @@ class Currency(StatesGroup):
     amount = State()
     base_currency = State()
     target_currency = State()
+
+
+def parse_amount(value: str) -> Decimal:
+    """Проверяет единый формат суммы для сообщения и inline-ввода."""
+    text = value.strip()
+    if len(text) > MAX_AMOUNT_LENGTH or re.fullmatch(
+        r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)", text
+    ) is None:
+        raise ValueError("Недопустимая сумма")
+    amount = Decimal(text)
+    if not amount.is_finite() or amount < 0:
+        raise ValueError("Недопустимая сумма")
+    return amount
+
+
+def _amount_prompt(amount: Decimal) -> str:
+    """Формирует одинаковый переход к выбору базовой валюты."""
+    return _("Сумма операции: {user_value}\nБазовая валюта: ").format(
+        user_value=amount
+    )
+
+
+async def _confirm_amount(
+    state: FSMContext, amount: Decimal, raw_value: str
+) -> None:
+    """Сохраняет подтверждённую сумму без очистки языка пользователя."""
+    await state.update_data(currency_amount=str(amount), user_value=raw_value)
+    await state.set_state(Currency.base_currency)
+
+
+async def _dismiss_keypad(message: Message, message_id: int | None) -> None:
+    """По возможности убирает кнопки старого цифрового сообщения."""
+    if message_id is None:
+        return
+    try:
+        await message.bot.edit_message_reply_markup(
+            chat_id=message.chat.id,
+            message_id=message_id,
+            reply_markup=None,
+        )
+    except TelegramAPIError:
+        logger.warning("Не удалось убрать старую цифровую клавиатуру")
 
 
 async def get_currency_rate(
@@ -109,29 +156,42 @@ async def process_reopen(
     """Начинает новый расчёт."""
     await state.update_data(user_value="")
     await message.answer("💵", reply_markup=keyboard.del_kb)
-    await message.answer(_("Сумма операции: 0.0"), reply_markup=keyboard.markup_num())
+    keypad = await message.answer(
+        _("Сумма операции: 0.0"),
+        reply_markup=keyboard.markup_num(),
+    )
+    await state.update_data(currency_keypad_message_id=keypad.message_id)
     await state.set_state(Currency.amount)
 
 
 @currency_router.callback_query(Currency.amount, F.data.startswith("num_"))
 async def process_amout(callback: CallbackQuery, state: FSMContext) -> None:
     """Принимает только допустимые действия цифровой клавиатуры."""
-    value = str((await state.get_data()).get("user_value", ""))
+    data = await state.get_data()
+    keypad_id = data.get("currency_keypad_message_id")
+    if (
+        await state.get_state() != Currency.amount.state
+        or callback.message is None
+        or (
+            keypad_id is not None
+            and callback.message.message_id != keypad_id
+        )
+    ):
+        await callback.answer(
+            _("Эта клавиатура устарела. Используйте текущую.")
+        )
+        return
+    value = str(data.get("user_value", ""))
     action = (callback.data or "").removeprefix("num_")
     if action == "enter":
         try:
-            amount = Decimal(value)
-            if not amount.is_finite() or amount < 0:
-                raise InvalidOperation
-        except InvalidOperation:
+            amount = parse_amount(value)
+        except (ValueError, InvalidOperation):
             await callback.answer(_("Ошибка в получении суммы"), show_alert=True)
             return
-        await state.update_data(currency_amount=str(amount))
-        await state.set_state(Currency.base_currency)
+        await _confirm_amount(state, amount, value)
         await callback.message.edit_text(
-            _("Сумма операции: {user_value}\nБазовая валюта: ").format(
-                user_value=amount
-            ),
+            _amount_prompt(amount),
             reply_markup=markup_cur,
         )
     else:
@@ -141,10 +201,10 @@ async def process_amout(callback: CallbackQuery, state: FSMContext) -> None:
         elif action == "com" and "." not in value:
             value = (value or "0") + "."
         elif action in {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "000"}:
-            if len(value) + len(action) > 18:
-                await callback.answer(_("Слишком длинная сумма"))
-                return
             value += action
+        if len(value) > MAX_AMOUNT_LENGTH:
+            await callback.answer(_("Слишком длинная сумма"))
+            return
         if value != previous:
             await state.update_data(user_value=value)
             await update_num_text(callback.message, value)
@@ -152,11 +212,27 @@ async def process_amout(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @currency_router.message(Currency.amount)
-async def process_amout_(message: Message) -> None:
-    """Отклоняет ввод вне клавиатуры."""
-    await message.answer(
-        _("Вы ввели не допустимые данные, введите сумму используя inline кнопки")
-    )
+async def process_amout_(message: Message, state: FSMContext) -> None:
+    """Принимает текст суммы как Enter, сохраняя FSM при ошибке ввода."""
+    if await state.get_state() != Currency.amount.state:
+        return
+    try:
+        amount = parse_amount(message.text or "")
+    except (ValueError, InvalidOperation):
+        await message.answer(_(
+            "Введите неотрицательное число до 18 символов: цифры и точка."
+        ))
+        return
+    data = await state.get_data()
+    await _confirm_amount(state, amount, (message.text or "").strip())
+    await _dismiss_keypad(message, data.get("currency_keypad_message_id"))
+    await message.answer(_amount_prompt(amount), reply_markup=markup_cur)
+
+
+@currency_router.callback_query(F.data.startswith("num_"))
+async def stale_numeric_keypad(callback: CallbackQuery) -> None:
+    """Подтверждает устаревшие нажатия без изменения текущего диалога."""
+    await callback.answer(_("Эта клавиатура устарела. Используйте текущую."))
 
 
 @currency_router.callback_query(Currency.base_currency, F.data.in_(CURRENCY_CODES))

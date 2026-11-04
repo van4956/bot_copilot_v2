@@ -3,16 +3,28 @@
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
+import pytest
 from aiogram.types import Update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import create_bot, create_dispatcher
 from config_data.config import Config, DataBase, Redis, TgBot
 from database.models import Base
-from handlers import donate, miniapp, other, private
+from handlers import cookbook, donate, other, private
 
 
-async def test_global_commands_escape_state_handlers(monkeypatch):
+@pytest.mark.parametrize(
+    "initial_state",
+    [
+        "Currency:amount",
+        "City:city_name_moment",
+        "Donate:donate_input_x",
+        "AddProduct:recipe_name",
+        "AddProduct:price",
+        "AddProduct:image",
+    ],
+)
+async def test_global_commands_escape_state_handlers(monkeypatch, initial_state):
     """Команды меню проходят раньше широких обработчиков текущего FSM."""
     config = Config(
         tg_bot=TgBot(token="", token_test="123456:OFFLINE_TEST_ONLY"),
@@ -32,14 +44,14 @@ async def test_global_commands_escape_state_handlers(monkeypatch):
         assert dp.sub_routers[0] is donate.payment_router
         state = dp.fsm.get_context(bot=bot, chat_id=9000000001, user_id=9000000001)
         cases = [
-            ("/mini", miniapp, "cmd_miniapp"),
+            ("/book", cookbook, "process_cookbook_command"),
             ("/info", other, "process_help_command"),
             ("/main", private, "cancel_cmd"),
         ]
         for number, (command, module, function) in enumerate(cases, 1):
             handler = AsyncMock()
             monkeypatch.setattr(module, function, handler)
-            await state.set_state("Currency:amount")
+            await state.set_state(initial_state)
             await state.set_data({"locale": "en", "user_value": "5"})
             update = Update.model_validate(
                 {

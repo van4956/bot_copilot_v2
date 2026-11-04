@@ -132,6 +132,11 @@ def test_russian_catalog_keeps_new_messages_in_russian() -> None:
         "Не удалось проверить счёт. Попробуйте позже.",
         "Донат успешно возвращён.",
         "Не удалось принять результат игры.",
+        "Слова 🧩",
+        "Данная функция в разработке",
+        "Мини-приложения временно недоступны",
+        "Введите неотрицательное число до 18 символов: цифры и точка.",
+        "Эта клавиатура устарела. Используйте текущую.",
     ]:
         assert translator.gettext(text) == text
 
@@ -141,6 +146,7 @@ def test_russian_catalog_keeps_new_messages_in_russian() -> None:
     ("Валюта 💵", "Currency 💵"),
     ("Котики 🐱", "Cats 🐱"),
     ("Книга 📖", "Cookbook 📖"),
+    ("Слова 🧩", "Words 🧩"),
     ("Назад на главную ↩️", "Back to main ↩️"),
     ("Сервисы", "Services"),
     ("Игры", "Games"),
@@ -193,6 +199,46 @@ def test_new_errors_have_human_readable_english(
     assert "<ID>" not in translated
 
 
+@pytest.mark.parametrize("original,expected", [
+    ("Слова 🧩", "Words 🧩"),
+    ("Данная функция в разработке", "This feature is under development"),
+    (
+        "Мини-приложения временно недоступны",
+        "Mini apps are temporarily unavailable",
+    ),
+    (
+        "Введите неотрицательное число до 18 символов: цифры и точка.",
+        "Enter a non-negative number of up to 18 characters, "
+        "using digits and a decimal point.",
+    ),
+    (
+        "Эта клавиатура устарела. Используйте текущую.",
+        "This keyboard is outdated. Use the current one.",
+    ),
+])
+def test_updated_ui_has_compiled_english_translation(
+    original: str, expected: str
+) -> None:
+    """Новые кнопки и подсказки читаются из английского MO-каталога."""
+    assert _translator("en").gettext(original) == expected
+
+
+@pytest.mark.parametrize("language,previous_translation", [
+    ("ru", "Введите сумму сообщением или используйте кнопки и Enter."),
+    ("en", "Send the amount as a message, or use the buttons and Enter."),
+])
+def test_removed_amount_hint_is_only_obsolete(
+    language: str, previous_translation: str
+) -> None:
+    """Удалённая подсказка не активна, прежний перевод сохранён."""
+    original = "Введите сумму сообщением или используйте кнопки и Enter."
+    catalog = _catalog(language)
+
+    assert catalog.get(original) is None
+    assert catalog.obsolete[original].string == previous_translation
+    assert _translator(language).gettext(original) == original
+
+
 def test_compiled_catalog_formats_game_score() -> None:
     """Подстановка результата работает после загрузки MO."""
     message = "Игра окончена!\nВаш счет: {score}"
@@ -223,4 +269,4 @@ def test_actual_keyboard_uses_compiled_english_catalog() -> None:
         markup = keyboard.start_keyboard()
     texts = [button.text for row in markup.keyboard for button in row]
 
-    assert texts == ["Weather 🌊", "Currency 💵", "Cats 🐱", "Cookbook 📖"]
+    assert texts == ["Weather 🌊", "Currency 💵", "Cats 🐱", "Words 🧩"]

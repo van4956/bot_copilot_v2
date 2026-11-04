@@ -3,13 +3,27 @@
 from aiogram import F, Router
 from aiogram.filters import Command, or_f
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
+from aiogram.utils.i18n import gettext as _
+from aiogram.utils.i18n import lazy_gettext as __
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from common import keyboard
 from filters.chat_type import ChatTypeFilter
-from handlers import miniapp, other, private
+from handlers import cookbook, other, private
+
+# from handlers import miniapp
 
 navigation_router = Router()
 navigation_router.message.filter(ChatTypeFilter("private"))
+navigation_router.callback_query.filter(F.message.chat.type == "private")
+WORDS = __("Слова 🧩")
+DISABLED_MINIAPP_CALLBACKS = {
+    "service_miniapp",
+    "game_miniapp",
+    "back_to_mini",
+    "mini_back_to_main",
+}
 
 
 async def reset_dialog(state: FSMContext) -> None:
@@ -26,11 +40,42 @@ async def open_main(message: Message, state: FSMContext) -> None:
     await private.cancel_cmd(message, state)
 
 
-@navigation_router.message(Command("mini"))
-async def open_mini(message: Message, state: FSMContext) -> None:
-    """Открывает мини-приложения, не оставляя старый FSM."""
+# Мини-приложения временно скрыты. Для возврата раздела нужны его роутеры в app.py.
+# @navigation_router.message(Command("mini"))
+# async def open_mini(message: Message, state: FSMContext) -> None:
+#     await reset_dialog(state)
+#     await miniapp.cmd_miniapp(message)
+
+
+@navigation_router.message(Command("book"))
+async def open_book(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    """Открывает прежнюю книгу из любого диалога, сохраняя её страницу."""
+    data = await state.get_data()
     await reset_dialog(state)
-    await miniapp.cmd_miniapp(message)
+    if "page" in data:
+        await state.update_data(page=data["page"])
+    await cookbook.process_cookbook_command(message, state, session)
+
+
+@navigation_router.message(F.text == WORDS)
+async def open_words(message: Message, state: FSMContext) -> None:
+    """Показывает заглушку будущей игры в слова."""
+    await reset_dialog(state)
+    await message.answer(
+        _("Данная функция в разработке"), reply_markup=keyboard.start_keyboard()
+    )
+
+
+@navigation_router.callback_query(F.data.in_(DISABLED_MINIAPP_CALLBACKS))
+async def unavailable_miniapp_callback(callback: CallbackQuery) -> None:
+    """Отвечает на старые кнопки без запуска скрытого раздела."""
+    await callback.answer(_("Мини-приложения временно недоступны"), show_alert=True)
+
+
+@navigation_router.message(F.web_app_data)
+async def unavailable_miniapp_result(message: Message) -> None:
+    """Не передаёт старый результат игры в текущий диалог или базу."""
+    await message.answer(_("Мини-приложения временно недоступны"))
 
 
 @navigation_router.message(Command("info"))

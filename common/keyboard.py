@@ -51,7 +51,7 @@ def start_keyboard() -> ReplyKeyboardMarkup:
         _("Погода 🌊"),
         _("Валюта 💵"),
         _("Котики 🐱"),
-        _("Книга 📖"),
+        _("Слова 🧩"),
         sizes=(
             2,
             2,

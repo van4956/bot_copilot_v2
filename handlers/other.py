@@ -131,7 +131,7 @@ async def update_locale_cmd(
                 "Weather 🌊",
                 "Currency 💵",
                 "Cats 🐱",
-                "Cookbook 📖",
+                "Words 🧩",
                 sizes=(
                     2,
                     2,
@@ -152,7 +152,7 @@ async def update_locale_cmd(
                 "Погода 🌊",
                 "Валюта 💵",
                 "Котики 🐱",
-                "Книга 📖",
+                "Слова 🧩",
                 sizes=(
                     2,
                     2,

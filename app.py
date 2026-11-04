@@ -132,7 +132,7 @@ def create_dispatcher(
             currency,
             donate,
             group,
-            miniapp,
+            # miniapp,  # Мини-приложения временно скрыты, код сохранён.
             navigation,
             other,
             owner,
@@ -143,7 +143,7 @@ def create_dispatcher(
 
         routers = [
             donate.payment_router,
-            miniapp.webapp_data_router,
+            # miniapp.webapp_data_router,
             navigation.navigation_router,
             start.start_router,
             owner.owner_router,
@@ -153,7 +153,7 @@ def create_dispatcher(
             weather.weather_router,
             currency.currency_router,
             cookbook.cookbook_router,
-            miniapp.miniapp_router,
+            # miniapp.miniapp_router,
             group.group_router,
             other.other_router,
         ]

@@ -18,13 +18,13 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.16.0\n"
 
-#: common/keyboard.py:51 handlers/cookbook.py:26
+#: handlers/cookbook.py:26
 msgid "Книга 📖"
 msgstr ""
 
-#: handlers/cookbook.py:86 handlers/cookbook.py:195 handlers/currency.py:24
-#: handlers/currency.py:97 handlers/donate.py:55 handlers/miniapp.py:44
-#: handlers/miniapp.py:83 handlers/other.py:44 handlers/other.py:90
+#: handlers/cookbook.py:86 handlers/cookbook.py:195 handlers/currency.py:27
+#: handlers/currency.py:144 handlers/donate.py:55 handlers/miniapp.py:47
+#: handlers/miniapp.py:88 handlers/other.py:44 handlers/other.py:90
 #: handlers/other.py:225 handlers/other.py:267 handlers/private.py:29
 #: handlers/private.py:92 handlers/private.py:143 handlers/weather.py:165
 #: handlers/weather.py:177 handlers/weather.py:309 handlers/weather.py:328
@@ -50,57 +50,63 @@ msgid "Не удалось открыть страницу"
 msgstr ""
 
 #: handlers/cookbook.py:202 handlers/donate.py:121 handlers/donate.py:282
-#: handlers/miniapp.py:150 handlers/private.py:37 handlers/private.py:51
+#: handlers/miniapp.py:153 handlers/private.py:37 handlers/private.py:51
 #: handlers/private.py:145
 msgid "Главная панель"
 msgstr ""
 
-#: common/keyboard.py:51 handlers/currency.py:22
+#: common/keyboard.py:52 handlers/currency.py:25
 msgid "Валюта 💵"
 msgstr ""
 
-#: handlers/currency.py:23 handlers/currency.py:96
+#: handlers/currency.py:26 handlers/currency.py:143
 msgid "Повторить 💵"
 msgstr ""
 
-#: handlers/currency.py:88
-msgid "Сумма операции: {new_value}"
-msgstr ""
-
-#: handlers/currency.py:112
-msgid "Сумма операции: 0.0"
-msgstr ""
-
-#: handlers/currency.py:127
-msgid "Ошибка в получении суммы"
-msgstr ""
-
-#: handlers/currency.py:132
+#: handlers/currency.py:71
 msgid ""
 "Сумма операции: {user_value}\n"
 "Базовая валюта: "
 msgstr ""
 
-#: handlers/currency.py:145
+#: handlers/currency.py:135
+msgid "Сумма операции: {new_value}"
+msgstr ""
+
+#: handlers/currency.py:160
+msgid "Сумма операции: 0.0"
+msgstr ""
+
+#: handlers/currency.py:181 handlers/currency.py:235
+msgid "Эта клавиатура устарела. Используйте текущую."
+msgstr ""
+
+#: handlers/currency.py:190
+msgid "Ошибка в получении суммы"
+msgstr ""
+
+#: handlers/currency.py:206
 msgid "Слишком длинная сумма"
 msgstr ""
 
-#: handlers/currency.py:158
-msgid "Вы ввели не допустимые данные, введите сумму используя inline кнопки"
+#: handlers/currency.py:222
+msgid "Введите неотрицательное число до 18 символов: цифры и точка."
 msgstr ""
 
-#: handlers/currency.py:169
+#: handlers/currency.py:245
 msgid ""
 "Сумма операции: {amount}\n"
 "Базовая валюта: {base}\n"
 "Целевая валюта: "
 msgstr ""
 
-#: handlers/currency.py:181
-msgid "Вы ввели не допустимые данные, введите базовую валюту используя inline кнопки"
+#: handlers/currency.py:257
+msgid ""
+"Вы ввели не допустимые данные, введите базовую валюту используя inline "
+"кнопки"
 msgstr ""
 
-#: handlers/currency.py:205
+#: handlers/currency.py:281
 msgid ""
 "Сумма операции: {amount}\n"
 "Базовая валюта: {base}\n"
@@ -111,24 +117,26 @@ msgid ""
 "<b>{amount} {base}  ~  {count} {target}</b>"
 msgstr ""
 
-#: handlers/currency.py:216
+#: handlers/currency.py:292
 msgid "Успех"
 msgstr ""
 
-#: handlers/currency.py:218
+#: handlers/currency.py:294
 msgid "Сервис валют временно недоступен"
 msgstr ""
 
-#: handlers/currency.py:219
+#: handlers/currency.py:295
 msgid "Ошибка"
 msgstr ""
 
-#: handlers/currency.py:225
+#: handlers/currency.py:301
 msgid "Что дальше?"
 msgstr ""
 
-#: handlers/currency.py:232
-msgid "Вы ввели не допустимые данные, введите целевую валюту используя inline кнопки"
+#: handlers/currency.py:308
+msgid ""
+"Вы ввели не допустимые данные, введите целевую валюту используя inline "
+"кнопки"
 msgstr ""
 
 #: handlers/donate.py:54
@@ -206,8 +214,8 @@ msgstr ""
 
 #: handlers/donate.py:247
 msgid ""
-"Telegram подтвердил возврат, но локальный статус не сохранён. Обратитесь к "
-"автору бота."
+"Telegram подтвердил возврат, но локальный статус не сохранён. Обратитесь "
+"к автору бота."
 msgstr ""
 
 #: handlers/donate.py:252
@@ -222,34 +230,46 @@ msgstr ""
 msgid "Донат отменён."
 msgstr ""
 
-#: handlers/miniapp.py:39 handlers/miniapp.py:115
+#: handlers/miniapp.py:41 handlers/miniapp.py:118
 msgid "Сервисы"
 msgstr ""
 
-#: handlers/miniapp.py:41 handlers/miniapp.py:115
+#: handlers/miniapp.py:43 handlers/miniapp.py:118
 msgid "Игры"
 msgstr ""
 
-#: handlers/miniapp.py:95
+#: handlers/miniapp.py:100
 msgid "Фабрика по производству мини-приложений:"
 msgstr ""
 
-#: handlers/miniapp.py:112
+#: handlers/miniapp.py:116
 msgid "Мини-приложения не настроены для этого бота."
 msgstr ""
 
-#: handlers/miniapp.py:184
+#: handlers/miniapp.py:185
 msgid "Не удалось принять результат игры."
 msgstr ""
 
-#: handlers/miniapp.py:194
+#: handlers/miniapp.py:198
 msgid ""
 "Игра окончена!\n"
 "Ваш счет: {score}"
 msgstr ""
 
-#: handlers/miniapp.py:205
+#: handlers/miniapp.py:211
 msgid "Произошла ошибка мини-приложения. Попробуйте позже."
+msgstr ""
+
+#: common/keyboard.py:54 handlers/navigation.py:20
+msgid "Слова 🧩"
+msgstr ""
+
+#: handlers/navigation.py:65
+msgid "Данная функция в разработке"
+msgstr ""
+
+#: handlers/navigation.py:72 handlers/navigation.py:78
+msgid "Мини-приложения временно недоступны"
 msgstr ""
 
 #: handlers/other.py:34
@@ -321,7 +341,7 @@ msgid ""
 "\n"
 msgstr ""
 
-#: common/keyboard.py:51 handlers/private.py:30
+#: common/keyboard.py:53 handlers/private.py:30
 msgid "Котики 🐱"
 msgstr ""
 
@@ -348,9 +368,9 @@ msgstr ""
 msgid ""
 "Привет {user_name}.\n"
 "\n"
-"Я экспериментальный Telegram bot, model Т-4. Создан для проверки и отладки "
-"навыков главного разработчика. Реализую различные команды, методы и функции."
-"\n"
+"Я экспериментальный Telegram bot, model Т-4. Создан для проверки и "
+"отладки навыков главного разработчика. Реализую различные команды, методы"
+" и функции.\n"
 "\n"
 "Весь основной функционал находится на Главной панели.\n"
 "\n"
