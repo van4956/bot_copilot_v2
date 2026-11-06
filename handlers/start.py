@@ -100,7 +100,7 @@ async def start_cmd(
             bot, f"✅ {user_label} - подписался на бота"
         )
     await message.answer(
-        _("Бот активирован!"), reply_markup=keyboard.start_keyboard()
+        _("Бот активирован!"), reply_markup=keyboard.start_keyboard(bot=bot)
     )
 
 

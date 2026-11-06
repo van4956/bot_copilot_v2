@@ -100,7 +100,9 @@ async def process_cookbook_command(
             await state.update_data(page=1)
             await message.answer(
                 _("Книга рецептов пуста"),
-                reply_markup=keyboard.start_keyboard(),
+                reply_markup=keyboard.start_keyboard(
+                    bot=getattr(message, "bot", None)
+                ),
             )
             return
         page = normalize_page((await state.get_data()).get("page"), len(book))
@@ -134,7 +136,9 @@ async def _turn_page(
             await callback.message.delete()
             await callback.message.answer(
                 _("Книга рецептов пуста"),
-                reply_markup=keyboard.start_keyboard(),
+                reply_markup=keyboard.start_keyboard(
+                    bot=getattr(callback, "bot", None)
+                ),
             )
             return
         state_data = await state.get_data()
@@ -199,5 +203,8 @@ async def process_cookbook_back_press(
         except TelegramAPIError:
             logger.info("Старая карточка книги уже недоступна")
         await callback.message.answer(
-            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+            _("Главная панель"),
+            reply_markup=keyboard.start_keyboard(
+                bot=getattr(callback, "bot", None)
+            ),
         )

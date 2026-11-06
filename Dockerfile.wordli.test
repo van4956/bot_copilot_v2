@@ -1,0 +1,19 @@
+ARG WORDLI_BASE_IMAGE=copilot-wordli:local
+FROM ${WORDLI_BASE_IMAGE}
+
+USER root
+RUN python -m pip install --no-cache-dir \
+    pytest==8.4.2 pytest-asyncio==1.2.0 aiosqlite==0.20.0
+
+# Не копируем проектный conftest с aiogram и его ограничением aiohttp<3.10.
+COPY pytest.ini /app/pytest.ini
+COPY testing/wordli_qa_conftest.py /app/qa_tests/conftest.py
+COPY tests/test_wordli_engine.py tests/test_wordli_storage.py \
+    tests/test_wordli_dictionary.py tests/test_wordli_local_server.py \
+    tests/test_wordli_telegram_auth.py tests/test_wordli_telegram_server.py \
+    tests/test_wordli_production_server.py tests/test_wordli_production_schema.py \
+    tests/test_wordli_postgres_integration.py /app/qa_tests/
+
+ENV APP_ENV=test
+USER 10001:10001
+CMD ["python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "qa_tests"]

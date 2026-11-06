@@ -636,3 +636,19 @@ msgstr "Локация получена"
 #~ msgid "Введите сумму сообщением или используйте кнопки и Enter."
 #~ msgstr "Введите сумму сообщением или используйте кнопки и Enter."
 
+
+#: handlers/navigation.py:99
+msgid "В какую игру сыграем?"
+msgstr "В какую игру сыграем?"
+
+#: common/keyboard.py
+msgid "Игры 🕹"
+msgstr "Игры 🕹"
+
+#: handlers/navigation.py
+msgid "Битва Измерений"
+msgstr "Битва Измерений"
+
+#: handlers/navigation.py
+msgid "Игра в разработке"
+msgstr "Игра в разработке"

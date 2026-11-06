@@ -31,7 +31,7 @@ def isolate_telegram(monkeypatch: pytest.MonkeyPatch) -> None:
         Bot, "__call__", AsyncMock(side_effect=AssertionError("No Telegram"))
     )
     monkeypatch.setattr(start, "_", lambda text: text)
-    monkeypatch.setattr(start.keyboard, "start_keyboard", lambda: None)
+    monkeypatch.setattr(start.keyboard, "start_keyboard", lambda bot=None: None)
 
 
 @pytest_asyncio.fixture

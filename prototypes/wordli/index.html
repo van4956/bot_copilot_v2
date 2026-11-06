@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1c1c1e">
+  <meta name="referrer" content="no-referrer">
+  <title>5БУКВ</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="prototype.js" defer></script>
+</head>
+<body data-screen="game">
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="wordmark" aria-label="5 букв">
+        <span aria-hidden="true">5</span><span aria-hidden="true">Б</span><span aria-hidden="true">У</span><span aria-hidden="true">К</span><span aria-hidden="true">В</span>
+      </div>
+      <nav class="header-actions" aria-label="Разделы игры">
+        <button class="icon-button" type="button" data-action="open-stats" aria-label="Открыть статистику" title="Статистика">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4v8H4zM10 4h4v16h-4zM16 8h4v12h-4z"/></svg>
+        </button>
+        <button class="icon-button" type="button" data-action="open-settings" aria-label="Открыть настройки" title="Настройки">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.3-1.8 1-2.3-.6-2.4 4.2 1.7 1.7v2.1l-1.7 1.7 2.4 4.2 2.3-.6 1.8 1 .6 2.3h5l.6-2.3 1.8-1 2.3.6 2.4-4.2-1.7-1.7v-2.1l1.7-1.7-2.4-4.2-2.3.6-1.8-1L14.5 3z"/><circle cx="12" cy="12.6" r="3.1"/></svg>
+        </button>
+        <button class="icon-button" type="button" data-action="close-app" aria-label="Свернуть приложение" title="Свернуть приложение">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </nav>
+    </header>
+
+    <main id="game-screen" class="screen screen--game" aria-label="Игра 5 букв">
+      <div id="board" class="board" role="grid" aria-label="Игровое поле: 6 попыток по 5 букв" aria-rowcount="6" aria-colcount="5"></div>
+      <div id="keyboard" class="keyboard" role="group" aria-label="Клавиатура"></div>
+    </main>
+
+    <section id="stats-screen" class="screen screen--stats" aria-labelledby="stats-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-game" aria-label="Назад к игре" title="Назад к игре">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="stats-title">Статистика</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="stats-grid" aria-label="Личная статистика">
+        <article class="stat-card"><strong class="stat-value" data-stat="played">0</strong><span class="stat-label">Всего сыграно</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="win-rate">0%</strong><span class="stat-label">Доля побед</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="average">—</strong><span class="stat-label">Попыток на победу</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="max-streak">0</strong><span class="stat-label">Максимальная серия</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="win-streak">0</strong><span class="stat-label">Текущая серия</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="score">—</strong><span class="stat-label">Очков</span></article>
+      </div>
+      <section class="distribution-section" aria-labelledby="distribution-title">
+        <h2 id="distribution-title">Распределение попыток</h2>
+        <div id="distribution" class="distribution" role="list" aria-label="Победы за 1–6 попыток"></div>
+      </section>
+    </section>
+
+    <section id="settings-screen" class="screen screen--settings" aria-labelledby="settings-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-game" aria-label="Назад к игре" title="Назад к игре">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="settings-title">Настройки</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="settings-block reminder-block">
+        <div class="reminder-heading">
+          <h2>Напоминание</h2>
+          <button class="reminder-switch" type="button" role="switch" aria-checked="false" aria-label="Напоминание — пока недоступно" disabled><span></span></button>
+        </div>
+        <time id="next-word-countdown" class="next-word-countdown" aria-label="До нового слова">00:00:00</time>
+        <p class="reminder-caption">до нового слова</p>
+      </div>
+      <button class="settings-block rules-link" type="button" data-action="open-rules">
+        <span class="rules-link-title">Правила</span>
+        <span class="rules-link-caption">игры «5 букв»</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <section id="rules-screen" class="screen screen--rules" aria-labelledby="rules-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="rules-title">Правила</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <article class="rules-content">
+        <h2>Правила игры «5 букв»</h2>
+        <p>Каждый день мы загадываем существительное из пяти букв в единственном числе.</p>
+        <p>На разгадку у вас шесть попыток. После каждой попытки цвет букв меняется. Вот что означают цвета.</p>
+        <hr>
+        <div class="rules-example" role="img" aria-label="МЫСЛЬ: М, Л, Ь — белые; Ы, С — серые">
+          <span class="rule-tile rule-tile--present">М</span><span class="rule-tile rule-tile--absent">Ы</span><span class="rule-tile rule-tile--absent">С</span><span class="rule-tile rule-tile--present">Л</span><span class="rule-tile rule-tile--present">Ь</span>
+        </div>
+        <p>Буквы «М», «Л», «Ь» белые — они есть в загаданном слове, но стоят в других местах. Буквы «Ы», «С» серые — их в слове нет.</p>
+        <div class="rules-example" role="img" aria-label="ФИКУС: Ф, И — жёлтые; К, У, С — серые">
+          <span class="rule-tile rule-tile--correct">Ф</span><span class="rule-tile rule-tile--correct">И</span><span class="rule-tile rule-tile--absent">К</span><span class="rule-tile rule-tile--absent">У</span><span class="rule-tile rule-tile--absent">С</span>
+        </div>
+        <p>Буквы «Ф», «И» жёлтые — они есть в загаданном слове и стоят на нужных местах.</p>
+        <div class="rules-example" role="img" aria-label="ФИЛЬМ: все пять букв жёлтые, слово угадано">
+          <span class="rule-tile rule-tile--correct">Ф</span><span class="rule-tile rule-tile--correct">И</span><span class="rule-tile rule-tile--correct">Л</span><span class="rule-tile rule-tile--correct">Ь</span><span class="rule-tile rule-tile--correct">М</span>
+        </div>
+        <p>Когда вы угадаете слово, все буквы окрасятся в жёлтый.</p>
+        <hr>
+        <p>В загаданном слове могут встретиться повторяющиеся буквы, например буква «Т» в слове «Театр». Буквы «Ё» в игре нет, вместо неё используйте «Е» — как в кроссворде.</p>
+      </article>
+    </section>
+
+    <section id="summary-screen" class="screen screen--summary" aria-labelledby="result-title" hidden>
+      <h1 id="result-title" class="summary-title"></h1>
+      <p id="result-text" class="summary-text"></p>
+      <div id="progress-chain" class="progress-chain" role="list" aria-label="Цепочка отгаданных слов"></div>
+      <button class="primary-button replay-button" type="button" data-action="next-game">Играть ещё раз</button>
+      <div id="result-attempts" class="attempts-card">
+        <p>Количество попыток:</p>
+        <div class="attempts-value"><strong id="result-attempt-count">0</strong><span>/6</span></div>
+      </div>
+    </section>
+
+    <section id="exhausted-screen" class="screen screen--closed" aria-label="Все слова сыграны" hidden>
+      <h1>Все слова сыграны</h1>
+      <p>Вы прошли весь доступный словарь. Прогресс и статистика сохранены.</p>
+    </section>
+
+    <section id="closed-screen" class="screen screen--closed" aria-label="Приложение свёрнуто" hidden>
+      <p>Приложение свёрнуто</p>
+      <button class="primary-button" type="button" data-action="reopen-app">Вернуться к игре</button>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="confetti" class="confetti" aria-hidden="true"></div>
+</body>
+</html>

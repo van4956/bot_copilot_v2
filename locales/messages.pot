@@ -446,3 +446,19 @@ msgstr ""
 msgid "Локация получена"
 msgstr ""
 
+
+#: handlers/navigation.py:99
+msgid "В какую игру сыграем?"
+msgstr ""
+
+#: common/keyboard.py
+msgid "Игры 🕹"
+msgstr ""
+
+#: handlers/navigation.py
+msgid "Битва Измерений"
+msgstr ""
+
+#: handlers/navigation.py
+msgid "Игра в разработке"
+msgstr ""

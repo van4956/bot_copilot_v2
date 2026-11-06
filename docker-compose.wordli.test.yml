@@ -1,0 +1,50 @@
+name: wordli-production-review
+
+services:
+  db-test:
+    image: postgres:15-bookworm@sha256:539ceaaae49b3a7c8a04467cf00cc6788d8e3f1675df41860d86eebc4c40524f
+    environment:
+      POSTGRES_DB: copilot_review_test
+      POSTGRES_USER: review_admin
+      POSTGRES_PASSWORD: ${WORDLI_QA_ADMIN_PASSWORD:?Set isolated QA password}
+      BOT_APP_PASSWORD: ${WORDLI_QA_APP_PASSWORD:?Set isolated QA password}
+    tmpfs:
+      - /var/lib/postgresql/data:rw,size=256m
+    volumes:
+      - ./testing/postgres-init.sh:/docker-entrypoint-initdb.d/01-app.sh:ro
+      - ./testing/postgres-app.sql:/opt/review-app.sql:ro
+    networks: [review]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U review_admin -d copilot_review_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    mem_limit: 512m
+    restart: "no"
+
+  qa:
+    build:
+      context: .
+      dockerfile: Dockerfile.wordli.test
+      args:
+        WORDLI_BASE_IMAGE: copilot-wordli:local
+    image: copilot-wordli-qa:local
+    environment:
+      APP_ENV: test
+      RUN_INTEGRATION: "1"
+      TEST_DATABASE_URL: postgresql+asyncpg://bot_app:${WORDLI_QA_APP_PASSWORD}@db-test:5432/copilot_review_test
+      WORDLI_TEST_ADMIN_DATABASE_URL: postgresql+asyncpg://review_admin:${WORDLI_QA_ADMIN_PASSWORD}@db-test:5432/copilot_review_test
+    depends_on:
+      db-test: {condition: service_healthy}
+    networks: [review]
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=1700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    restart: "no"
+
+networks:
+  review:
+    internal: true

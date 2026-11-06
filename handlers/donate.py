@@ -118,7 +118,10 @@ async def cmd_donate_input(
         await state.update_data(donate_amount=None)
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.message.answer(
-            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+            _("Главная панель"),
+            reply_markup=keyboard.start_keyboard(
+                bot=getattr(callback, "bot", None)
+            ),
         )
     elif choice == "x":
         await callback.message.answer(
@@ -279,6 +282,9 @@ async def on_donate_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     if isinstance(callback.message, Message):
         await callback.message.delete()
         await callback.message.answer(
-            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+            _("Главная панель"),
+            reply_markup=keyboard.start_keyboard(
+                bot=getattr(callback, "bot", None)
+            ),
         )
     await callback.answer(_("Донат отменён."))

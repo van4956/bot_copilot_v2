@@ -47,7 +47,7 @@ def isolate_telegram(monkeypatch: pytest.MonkeyPatch) -> None:
         AsyncMock(side_effect=AssertionError("Telegram запрещён")),
     )
     monkeypatch.setattr(donate, "_", lambda text: text)
-    monkeypatch.setattr(donate.keyboard, "start_keyboard", lambda: None)
+    monkeypatch.setattr(donate.keyboard, "start_keyboard", lambda bot=None: None)
 
 
 @pytest_asyncio.fixture

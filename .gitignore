@@ -1,6 +1,7 @@
 .env
 .env.*.local
 .test-data/
+.playwright-mcp/
 .tools/
 .ruff_cache/
 .venv

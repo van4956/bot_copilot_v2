@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+COPY requirements-wordli.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-wordli.txt
+
+# Явный список не переносит .env, тестовые базы, логи или остальные миниаппы.
+COPY prototypes/wordli/ /app/prototypes/wordli/
+COPY config_data/config.py /app/config_data/config.py
+USER 10001:10001
+
+CMD ["python", "-m", "prototypes.wordli.production_server", "--host", "0.0.0.0", "--port", "8770"]

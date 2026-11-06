@@ -59,6 +59,10 @@ class Config:
     drop_pending_updates: bool = False
     webapp_base_url: str = ""
     expected_test_bot_id: int | None = None
+    wordli_enabled: bool = False
+    wordli_webapp_url: str = ""
+    wordli_custom_emoji_id: str = ""
+    wordli_custom_emoji_fallback: str = ""
 
     @property
     def test_mode(self) -> bool:
@@ -94,6 +98,46 @@ def _bool(value: str) -> bool:
     if value.lower() not in {"true", "false", "1", "0"}:
         raise ValueError("Ожидается true или false")
     return value.lower() in {"true", "1"}
+
+
+def validate_wordli_url(value: str, *, test_mode: bool) -> str:
+    """Проверяет отдельный HTTPS-адрес игры без учётных данных."""
+    if not value:
+        return ""
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+        invalid = (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or "?" in value
+            or "#" in value
+            or "\\" in value
+            or any(
+                character.isspace() or ord(character) < 32 or ord(character) == 127
+                for character in value
+            )
+            or (port is not None and not 1 <= port <= 65535)
+            or value.startswith(PRODUCTION_WEBAPP_URL)
+            or (not test_mode and parsed.path not in {"", "/"})
+            or (
+                not test_mode
+                and (
+                    hostname == "trycloudflare.com"
+                    or hostname.endswith(".trycloudflare.com")
+                )
+            )
+        )
+    except ValueError:
+        invalid = True
+    if invalid:
+        raise ValueError("WORDLI_WEBAPP_URL требует отдельный HTTPS-адрес")
+    return value
 
 
 def load_config(path: str | None = None) -> Config:
@@ -150,6 +194,32 @@ def load_config(path: str | None = None) -> Config:
         raise ValueError("Мини-приложения требуют HTTPS")
     if test and webapp.startswith(PRODUCTION_WEBAPP_URL):
         raise ValueError("Тестовый бот не должен открывать боевые мини-приложения")
+    wordli_enabled = not test and _bool(values.get("WORDLI_ENABLED", "false"))
+    wordli = (
+        validate_wordli_url(
+            values.get("WORDLI_WEBAPP_URL", ""), test_mode=test
+        )
+        if test or wordli_enabled
+        else ""
+    )
+    if wordli_enabled and not wordli:
+        raise ValueError("При WORDLI_ENABLED=true нужен WORDLI_WEBAPP_URL")
+    emoji_id = values.get("WORDLI_CUSTOM_EMOJI_ID", "") if test else ""
+    emoji_fallback = ""
+    if emoji_id:
+        if not (
+            emoji_id.isascii()
+            and emoji_id.isdigit()
+            and 1 <= len(emoji_id) <= 32
+        ):
+            raise ValueError(
+                "WORDLI_CUSTOM_EMOJI_ID должен содержать 1–32 цифры"
+            )
+        emoji_fallback = values.get("WORDLI_CUSTOM_EMOJI_FALLBACK", "🧩")
+        if not emoji_fallback.strip():
+            raise ValueError(
+                "WORDLI_CUSTOM_EMOJI_FALLBACK не должен быть пустым"
+            )
     expected_id = values.get("EXPECTED_TEST_BOT_ID", "")
     return Config(
         tg_bot=TgBot(
@@ -179,5 +249,9 @@ def load_config(path: str | None = None) -> Config:
         and _bool(values.get("NOTIFY_SERVICE_CHAT", "true")),
         drop_pending_updates=_bool(values.get("DROP_PENDING_UPDATES", "false")),
         webapp_base_url=webapp,
+        wordli_enabled=wordli_enabled,
+        wordli_webapp_url=wordli,
+        wordli_custom_emoji_id=emoji_id,
+        wordli_custom_emoji_fallback=emoji_fallback,
         expected_test_bot_id=int(expected_id) if expected_id else None,
     )

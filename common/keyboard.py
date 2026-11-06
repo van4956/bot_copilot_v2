@@ -1,5 +1,6 @@
 """Клавиатуры пользовательского интерфейса."""
 
+from aiogram import Bot
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -45,9 +46,42 @@ def get_keyboard(
     )  # в поле ввода выводим текст placeholder
 
 
-# Функция стартовой клавиатуры
-def start_keyboard() -> ReplyKeyboardMarkup:
-    return get_keyboard(
+def wordli_custom_emoji(bot: Bot | None = None) -> tuple[str, str] | None:
+    """Возвращает явно настроенный custom emoji только тестового Wordli."""
+    identifier = getattr(bot, "wordli_custom_emoji_id", "")
+    if (
+        getattr(bot, "test_mode", False) is not True
+        or not getattr(bot, "wordli_webapp_url", "")
+        or not isinstance(identifier, str)
+        or not identifier.isascii()
+        or not identifier.isdigit()
+        or not 1 <= len(identifier) <= 32
+    ):
+        return None
+    fallback = getattr(bot, "wordli_custom_emoji_fallback", "") or "🧩"
+    if not isinstance(fallback, str) or not fallback.strip():
+        return None
+    return identifier, fallback
+
+
+def wordli_enabled(bot: Bot | None = None) -> bool:
+    """Проверяет тестовый вход либо явно разрешённую рабочую игру."""
+    test_mode = getattr(bot, "test_mode", None)
+    return (
+        (
+            test_mode is True
+            or (
+                test_mode is False
+                and getattr(bot, "wordli_enabled_verified", False) is True
+            )
+        )
+        and bool(getattr(bot, "wordli_webapp_url", ""))
+    )
+
+
+def start_keyboard(bot: Bot | None = None) -> ReplyKeyboardMarkup:
+    """Создаёт главную панель со значком разрешённой игры."""
+    markup = get_keyboard(
         _("Погода 🌊"),
         _("Валюта 💵"),
         _("Котики 🐱"),
@@ -58,6 +92,9 @@ def start_keyboard() -> ReplyKeyboardMarkup:
         ),
         placeholder="⬇️",
     )
+    if wordli_enabled(bot):
+        markup.keyboard[1][1].text = _("Игры 🕹")
+    return markup
 
 
 # создать обычные inline кнопки с отображаемым текстом

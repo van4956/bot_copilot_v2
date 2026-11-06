@@ -330,7 +330,10 @@ async def back_handler(
 async def exit_recipe_editor(message: Message, state: FSMContext) -> None:
     """Выходит из редактора, не принимая команду меню за значение поля."""
     await _reset_editor(state)
-    await message.answer("Главная панель", reply_markup=start_keyboard())
+    await message.answer(
+        "Главная панель",
+        reply_markup=start_keyboard(bot=getattr(message, "bot", None)),
+    )
 
 
 async def _read_text_field(

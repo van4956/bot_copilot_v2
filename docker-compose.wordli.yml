@@ -1,0 +1,48 @@
+name: copilot-wordli
+
+services:
+  wordliapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.wordli
+    image: copilot-wordli:${WORDLI_IMAGE_TAG:-local}
+    env_file:
+      - ${WORDLI_ENV_FILE:-.env.wordli.local}
+    environment:
+      APP_ENV: production
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:8770:8770"
+    networks:
+      - backend
+      - proxy
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=1700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8770/api/health',timeout=3)); assert r.get('ok') and r.get('mode')=='production'"
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: true
+    name: bot_copilot_backend
+  proxy:
+    driver: bridge

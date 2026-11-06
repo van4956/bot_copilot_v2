@@ -150,7 +150,10 @@ async def cmd_callback_about_to_main(callback: CallbackQuery) -> None:
     if isinstance(callback.message, Message):
         await callback.message.delete()
         await callback.message.answer(
-            _("Главная панель"), reply_markup=keyboard.start_keyboard()
+            _("Главная панель"),
+            reply_markup=keyboard.start_keyboard(
+                bot=getattr(callback, "bot", None)
+            ),
         )
 
 

@@ -21,7 +21,13 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from common.comands import admin_command, private_command
-from config_data.config import ROOT, Config, load_config, validate_test_database
+from config_data.config import (
+    ROOT,
+    Config,
+    load_config,
+    validate_test_database,
+    validate_wordli_url,
+)
 from database.models import Base
 from middlewares import counter, db, locale, throttle
 
@@ -80,6 +86,16 @@ class GracefulDispatcher(Dispatcher):
 
 def create_bot(config: Config) -> Bot:
     """Создаёт клиент без запросов к Telegram."""
+    wordli_requested = config.test_mode or config.wordli_enabled is True
+    wordli_url = (
+        validate_wordli_url(
+            config.wordli_webapp_url, test_mode=config.test_mode
+        )
+        if wordli_requested
+        else ""
+    )
+    if not config.test_mode and config.wordli_enabled is True and not wordli_url:
+        raise ValueError("При WORDLI_ENABLED=true нужен WORDLI_WEBAPP_URL")
     token = config.tg_bot.token_test if config.test_mode else config.tg_bot.token
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     for name in (
@@ -95,6 +111,16 @@ def create_bot(config: Config) -> Bot:
     bot.test_mode = config.test_mode
     bot.notify_service_chat = config.notify_service_chat
     bot.webapp_base_url = config.webapp_base_url
+    bot.wordli_webapp_url = wordli_url
+    bot.wordli_enabled_verified = bool(wordli_url and wordli_requested)
+    custom_emoji_enabled = bool(bot.wordli_webapp_url and config.test_mode)
+    bot.wordli_custom_emoji_id = (
+        config.wordli_custom_emoji_id if custom_emoji_enabled else ""
+    )
+    bot.wordli_custom_emoji_fallback = (
+        (config.wordli_custom_emoji_fallback or "🧩")
+        if custom_emoji_enabled and config.wordli_custom_emoji_id else ""
+    )
     return bot
 
 

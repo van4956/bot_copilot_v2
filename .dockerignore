@@ -24,7 +24,9 @@ wheels/
 .env
 .env.*.local
 .test-data/
+.playwright-mcp/
 .tools/
+.playwright-mcp/
 .ruff_cache/
 *.db
 *.sqlite
@@ -80,3 +82,6 @@ bot_04_copilot_v2_contents.txt
 # Testing
 testing/
 tests/
+
+# Атрибуция словаря должна сопровождать данные в образе Wordli.
+!prototypes/wordli/data/*.md

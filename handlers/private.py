@@ -34,7 +34,12 @@ CATS = __("Котики 🐱")
 @private_router.message(or_f(Command("main"), F.text == BACK_TO_MAIN))
 async def cancel_cmd(message: Message, state: FSMContext):
     await state.set_state(None)
-    await message.answer(_("Главная панель"), reply_markup=keyboard.start_keyboard())
+    await message.answer(
+        _("Главная панель"),
+        reply_markup=keyboard.start_keyboard(
+            bot=getattr(message, "bot", None)
+        ),
+    )
 
 
 # символ точка - ОТМЕНА, сброс любого состояния;
@@ -48,7 +53,12 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     await state.set_state(None)
     await message.answer(_("Действия отменены"))
     await asyncio.sleep(1)
-    await message.answer(_("Главная панель"), reply_markup=keyboard.start_keyboard())
+    await message.answer(
+        _("Главная панель"),
+        reply_markup=keyboard.start_keyboard(
+            bot=getattr(message, "bot", None)
+        ),
+    )
 
 
 # команда /author
@@ -142,7 +152,10 @@ async def callback_about(callback: CallbackQuery, state: FSMContext):
 
     await callback.answer(_("Назад на главную ↩️"))
     await callback.message.answer(
-        _("Главная панель"), reply_markup=keyboard.start_keyboard()
+        _("Главная панель"),
+        reply_markup=keyboard.start_keyboard(
+            bot=getattr(callback, "bot", None)
+        ),
     )
 
 
