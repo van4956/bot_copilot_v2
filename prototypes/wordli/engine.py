@@ -21,11 +21,11 @@ MAX_HISTORY_DAYS = MAX_HISTORY_RECORDS
 MAX_GAMES_PER_DAY = 1000
 DEFAULT_DICTIONARY = Path(__file__).with_name("data") / "ru5.json"
 WORD_PATTERN = re.compile(r"[А-Я]{5}\Z")
-DRAFT_PATTERN = re.compile(r"[А-Я]{0,5}\Z")
+DRAFT_PATTERN = re.compile(r"[А-Я ]{0,5}\Z")
 DAY_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
 STATE_PRIORITY = {"absent": 1, "present": 2, "correct": 3}
 LEGACY_DICTIONARY_ID = "ru5-opencorpora-wordfreq-v1-165050f1e2b8"
-SCORE_VERSION = "progress-quality-v1"
+SCORE_VERSION = "progress-quality-v2"
 
 
 class GameError(ValueError):
@@ -47,6 +47,17 @@ def normalize_word(value: str) -> str:
     if not WORD_PATTERN.fullmatch(word):
         raise GameError("invalid_word", "Введите слово из пяти русских букв.")
     return word
+
+
+def normalize_draft(value: str) -> str:
+    """Сохраняет позиции букв и пустых ячеек незавершённой строки."""
+    if not isinstance(value, str) or len(value) > 64:
+        raise GameError("invalid_draft", "Некорректная строка ввода.")
+    draft = unicodedata.normalize("NFC", value).upper().replace("Ё", "Е")
+    draft = draft.rstrip(" ")
+    if not DRAFT_PATTERN.fullmatch(draft):
+        raise GameError("invalid_draft", "Некорректная строка ввода.")
+    return draft
 
 
 def evaluate_guess(answer: str, guess: str) -> list[str]:
@@ -84,7 +95,7 @@ def calculate_score(
     progress = sqrt(min(played, pool_size) / pool_size)
     quality = (7 - average) / 6
     series = sqrt(min(max_streak, pool_size) / pool_size)
-    value = floor(1000 * progress * (wins / played) * (6 + 3 * quality + series))
+    value = floor(1000 * progress * (wins / played) * (4 + 4 * quality + 2 * series))
     return max(0, min(value, 10000))
 
 
@@ -322,6 +333,16 @@ class LocalGameEngine:
             "availability": {"remaining": remaining, "exhausted": remaining == 0},
         }
 
+    def statistics(self, history: list, today: date | None = None) -> dict[str, Any]:
+        """Считает статистику без выдачи нового слова и изменения истории."""
+        current = _today(today)
+        records = self._read_history(history, current)
+        games = [
+            self._evaluate_game(record, current)
+            for _, record in sorted(records.items())
+        ]
+        return self._statistics(games, current)
+
     def submit(
         self,
         history: list,
@@ -456,11 +477,10 @@ class LocalGameEngine:
             draft = raw.get("draft", "")
             if not isinstance(draft, str):
                 raise _invalid_history()
-            draft = (
-                unicodedata.normalize("NFC", draft).strip().upper().replace("Ё", "Е")
-            )
-            if not DRAFT_PATTERN.fullmatch(draft):
-                raise _invalid_history()
+            try:
+                draft = normalize_draft(draft)
+            except GameError:
+                raise _invalid_history() from None
             if len(normalized) == MAX_ATTEMPTS or answer in normalized:
                 draft = ""
             records[key] = {

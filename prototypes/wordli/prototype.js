@@ -39,8 +39,64 @@
     /** Нормализует набранные буквы, не подменяя латинские символы русскими. */
     function normalizeDraft(value) {
         if (typeof value !== 'string') return null;
-        const normalized = value.normalize('NFC').trim().toLocaleUpperCase('ru-RU').replace(/Ё/g, 'Е');
-        return /^[А-Я]{0,5}$/u.test(normalized) ? normalized : null;
+        const normalized = value.normalize('NFC').toLocaleUpperCase('ru-RU').replace(/Ё/g, 'Е').replace(/ +$/u, '');
+        return /^[А-Я ]{0,5}$/u.test(normalized) ? normalized : null;
+    }
+
+    /** Возвращает только известные точные позиции из уже проверенных попыток. */
+    function correctHints(rows = []) {
+        const hints = Array(WORD_LENGTH).fill('');
+        rows.forEach(row => row.states.forEach((value, index) => {
+            if (value === 'correct') hints[index] = row.word[index];
+        }));
+        return hints;
+    }
+
+    /** Находит начальную позицию курсора, не принимая подсказки за введённые буквы. */
+    function draftCursor(draft) {
+        const empty = draft.padEnd(WORD_LENGTH, ' ').indexOf(' ');
+        return empty < 0 ? WORD_LENGTH - 1 : empty;
+    }
+
+    /** Меняет одну позицию, не сдвигая остальные буквы активной строки. */
+    function editDraftCells(draft, cursor, action, letter = '') {
+        const cells = draft.padEnd(WORD_LENGTH, ' ').split('');
+        let position = Math.max(0, Math.min(WORD_LENGTH - 1, cursor));
+        if (action === 'delete') {
+            if (cells[position] === ' ' && position > 0) position -= 1;
+            cells[position] = ' ';
+        } else if (action === 'clear') {
+            cells[position] = ' ';
+        } else {
+            const normalized = normalizeDraft(letter);
+            if (!normalized || !/^[А-Я]$/u.test(normalized)) return {draft, cursor: position};
+            cells[position] = normalized;
+            position = Math.min(position + 1, WORD_LENGTH - 1);
+        }
+        return {draft: cells.join('').replace(/ +$/u, ''), cursor: position};
+    }
+
+    /** Определяет пояс игрока без доступа к геолокации. */
+    function browserTimezone(intl = Intl) {
+        try { return intl.DateTimeFormat().resolvedOptions().timeZone || 'Etc/GMT-4'; }
+        catch (_) { return 'Etc/GMT-4'; }
+    }
+
+    /** Принимает только публичные данные турнирной таблицы, без HTML и идентификаторов. */
+    function validateLeaderboard(value) {
+        const invalid = () => { throw new LocalApiError('invalid_response', 'Не удалось получить рейтинг'); };
+        if (!value || !Array.isArray(value.rows) || value.rows.length > 10
+            || !Number.isInteger(value.total) || value.total < value.rows.length
+            || typeof value.self_eligible !== 'boolean'
+            || ![null, 5].includes(value.separator_after)) invalid();
+        value.rows.forEach(row => {
+            if (!row || typeof row.name !== 'string' || row.name.length > 256
+                || !Number.isInteger(row.rank) || row.rank < 1
+                || !Number.isInteger(row.played) || row.played < 10
+                || !Number.isInteger(row.score) || row.score < 0 || row.score > 10000
+                || typeof row.is_self !== 'boolean') invalid();
+        });
+        return value;
     }
 
     function copyHistory(history) {
@@ -157,7 +213,8 @@
 
     /** Передаёт данные только на игровые адреса этого же приложения. */
     async function requestApi(fetchFunction, endpoint, payload) {
-        if (!['/api/state', '/api/guess', '/api/next', '/api/draft'].includes(endpoint)) throw new Error('Unsupported API endpoint');
+        const community = ['/api/settings', '/api/leaderboard'].includes(endpoint);
+        if (!community && !['/api/state', '/api/guess', '/api/next', '/api/draft'].includes(endpoint)) throw new Error('Unsupported API endpoint');
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 12000);
         try {
@@ -178,7 +235,14 @@
                     response.status, result?.state || null,
                 );
             }
-            return validateState(result);
+            if (endpoint === '/api/leaderboard') validateLeaderboard(result?.leaderboard);
+            else if (endpoint === '/api/settings') {
+                if (!result?.settings || typeof result.settings.timezone !== 'string'
+                    || typeof result.settings.reminder_enabled !== 'boolean') {
+                    throw new LocalApiError('invalid_response', 'Не удалось получить настройки');
+                }
+            }
+            return community ? result : validateState(result);
         } catch (error) {
             if (error instanceof LocalApiError) throw error;
             if (error?.code === 'authentication_failed') throw new LocalApiError(error.code, error.message, 401);
@@ -310,7 +374,7 @@
         const keyboard = doc.getElementById('keyboard');
         const toast = doc.getElementById('toast');
         const shell = doc.querySelector('.app-shell');
-        const screens = Object.fromEntries(['game', 'stats', 'settings', 'rules', 'summary', 'exhausted', 'closed']
+        const screens = Object.fromEntries(['game', 'stats', 'settings', 'rules', 'formula', 'leaderboard', 'summary', 'exhausted', 'closed']
             .map(name => [name, doc.getElementById(`${name}-screen`)]));
         const confetti = doc.getElementById('confetti');
         const reducedMotion = win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -335,6 +399,11 @@
         let inputQueue = [];
         let drainingInput = false;
         let client;
+        let cursor = 0;
+        let settings = null;
+        let settingsBusy = false;
+        let timezoneRegistered = false;
+        let leaderboardBusy = false;
 
         function clearMessage(keepStorageWarning = false) {
             if (keepStorageWarning && preserveStorageWarning(toast.textContent, win.performance.now(), storageWarningUntil)) return;
@@ -411,15 +480,18 @@
             const game = state?.game;
             const fragment = doc.createDocumentFragment();
             const animatedTiles = [];
+            const hints = correctHints(game?.rows);
             for (let rowIndex = 0; rowIndex < ROW_COUNT; rowIndex += 1) {
                 const row = doc.createElement('div');
                 row.className = 'board-row';
                 row.setAttribute('role', 'row');
                 for (let column = 0; column < WORD_LENGTH; column += 1) {
                     const accepted = game?.rows[rowIndex];
-                    const isDraft = game && !game.outcome && rowIndex === game.rows.length;
-                    const letter = accepted ? accepted.word[column] : isDraft ? game.draft[column] : '';
-                    const finalState = accepted ? accepted.states[column] : letter ? 'filled' : 'empty';
+                    const isDraft = game && game.status === 'in_progress' && !game.outcome && rowIndex === game.rows.length;
+                    const entered = isDraft ? (game.draft[column] || '').trim() : '';
+                    const hint = isDraft && !entered ? hints[column] : '';
+                    const letter = accepted ? accepted.word[column] : entered || hint;
+                    const finalState = accepted ? accepted.states[column] : entered ? 'filled' : 'empty';
                     const animated = accepted && rowIndex === animatedRow && !reducedMotion;
                     const tileState = animated ? 'filled' : finalState;
                     const tile = doc.createElement('div');
@@ -428,7 +500,15 @@
                     tile.setAttribute('role', 'gridcell');
                     tile.setAttribute('aria-label', `Ряд ${rowIndex + 1}, клетка ${column + 1}: ${letter || 'пусто'}${letter ? `, ${STATE_LABELS[finalState]}` : ''}`);
                     tile.textContent = letter || '';
-                    if (isDraft && column === Math.min(game.draft.length, WORD_LENGTH - 1)) tile.classList.add('tile--active');
+                    if (isDraft) {
+                        tile.classList.add('tile--editable');
+                        tile.dataset.column = String(column);
+                        if (hint) { tile.classList.add('tile--hint'); tile.dataset.hint = 'true'; }
+                        else if (entered && entered === hints[column]) tile.classList.add('tile--draft-correct');
+                        if (column === cursor) tile.classList.add('tile--active');
+                        tile.setAttribute('aria-selected', String(column === cursor));
+                        if (hint) tile.setAttribute('aria-label', `Ряд ${rowIndex + 1}, клетка ${column + 1}: подсказка ${hint}, ещё не введена`);
+                    }
                     if (animated) animatedTiles.push({tile, finalState, column});
                     row.appendChild(tile);
                 }
@@ -461,14 +541,22 @@
             const rowIndex = game.rows.length;
             const row = board.children[rowIndex];
             if (!row) return;
+            const hints = correctHints(game.rows);
             [...row.children].forEach((tile, column) => {
-                const letter = game.draft[column] || '';
-                const tileState = letter ? 'filled' : 'empty';
-                tile.className = `tile tile--${tileState}`;
+                const entered = (game.draft[column] || '').trim();
+                const hint = !entered ? hints[column] : '';
+                const letter = entered || hint;
+                const tileState = entered ? 'filled' : 'empty';
+                tile.className = `tile tile--${tileState} tile--editable`;
                 tile.dataset.state = tileState;
+                tile.dataset.column = String(column);
                 tile.textContent = letter;
-                tile.setAttribute('aria-label', `Ряд ${rowIndex + 1}, клетка ${column + 1}: ${letter || 'пусто'}${letter ? ', ввод' : ''}`);
-                if (column === Math.min(game.draft.length, WORD_LENGTH - 1)) tile.classList.add('tile--active');
+                tile.setAttribute('aria-label', hint ? `Ряд ${rowIndex + 1}, клетка ${column + 1}: подсказка ${hint}, ещё не введена`
+                    : `Ряд ${rowIndex + 1}, клетка ${column + 1}: ${letter || 'пусто'}${letter ? ', ввод' : ''}`);
+                if (hint) { tile.classList.add('tile--hint'); tile.dataset.hint = 'true'; }
+                else { delete tile.dataset.hint; if (entered && entered === hints[column]) tile.classList.add('tile--draft-correct'); }
+                if (column === cursor) tile.classList.add('tile--active');
+                tile.setAttribute('aria-selected', String(column === cursor));
             });
         }
         function makeKey(letter, action) {
@@ -564,6 +652,100 @@
             }
             doc.getElementById('progress-chain').replaceChildren(fragment);
         }
+        function renderReminder() {
+            const toggle = doc.getElementById('reminder-toggle');
+            toggle.disabled = !serverMode || !settings || settingsBusy;
+            toggle.setAttribute('aria-checked', String(settings?.reminder_enabled === true));
+            toggle.setAttribute('aria-label', serverMode ? 'Ежедневное напоминание сыграть' : 'Напоминания доступны в Telegram');
+            toggle.setAttribute('aria-busy', String(settingsBusy));
+        }
+        function communityRequest(endpoint, payload) {
+            return requestApi(win.WordliTelegram.createAuthenticatedFetch(win), endpoint, payload);
+        }
+        async function registerTimezone() {
+            if (!serverMode || timezoneRegistered || settingsBusy) return;
+            timezoneRegistered = true;
+            settingsBusy = true;
+            renderReminder();
+            try {
+                const result = await communityRequest('/api/settings', {timezone: browserTimezone(win.Intl)});
+                settings = result.settings;
+            } catch (error) {
+                if (screen === 'settings') showMessage(error.message);
+            } finally { settingsBusy = false; renderReminder(); }
+        }
+        async function toggleReminder() {
+            if (!serverMode || !settings || settingsBusy) return;
+            settingsBusy = true;
+            renderReminder();
+            try {
+                const result = await communityRequest('/api/settings', {
+                    reminder_enabled: !settings.reminder_enabled, timezone: browserTimezone(win.Intl),
+                });
+                settings = result.settings;
+            } catch (error) { showMessage(error.message); }
+            finally { settingsBusy = false; renderReminder(); }
+        }
+        async function loadSettings() {
+            if (!serverMode || settingsBusy) return;
+            settingsBusy = true;
+            renderReminder();
+            try { settings = (await communityRequest('/api/settings', {})).settings; }
+            catch (error) { if (screen === 'settings') showMessage(error.message); }
+            finally { settingsBusy = false; renderReminder(); }
+        }
+        async function loadLeaderboard() {
+            const status = doc.getElementById('leaderboard-status');
+            const table = doc.getElementById('leaderboard-table');
+            if (!serverMode) {
+                status.textContent = 'Турнирная таблица доступна в Telegram.';
+                table.hidden = true;
+                return;
+            }
+            if (leaderboardBusy) return;
+            leaderboardBusy = true;
+            status.textContent = 'Загрузка…';
+            table.hidden = true;
+            try {
+                const result = await communityRequest('/api/leaderboard', {});
+                const rating = result.leaderboard;
+                const fragment = doc.createDocumentFragment();
+                rating.rows.forEach((item, index) => {
+                    if (index === rating.separator_after) {
+                        const separator = doc.createElement('tr');
+                        separator.className = 'leaderboard-separator';
+                        const cell = doc.createElement('td');
+                        cell.colSpan = 3;
+                        cell.setAttribute('aria-label', 'Пропущенные участники');
+                        separator.appendChild(cell);
+                        fragment.appendChild(separator);
+                    }
+                    const row = doc.createElement('tr');
+                    if (item.is_self) { row.className = 'leaderboard-self'; row.setAttribute('aria-current', 'true'); }
+                    const name = doc.createElement('td');
+                    const content = doc.createElement('div');
+                    content.className = 'leaderboard-name';
+                    const rank = doc.createElement('span');
+                    rank.className = 'leaderboard-rank';
+                    rank.textContent = String(item.rank);
+                    const label = doc.createElement('span');
+                    label.textContent = item.name;
+                    content.append(rank, label);
+                    name.appendChild(content);
+                    const played = doc.createElement('td');
+                    played.textContent = String(item.played);
+                    const score = doc.createElement('td');
+                    score.textContent = String(item.score);
+                    row.append(name, played, score);
+                    fragment.appendChild(row);
+                });
+                doc.getElementById('leaderboard-rows').replaceChildren(fragment);
+                table.hidden = !rating.rows.length;
+                status.textContent = !rating.rows.length ? 'Пока нет участников с десятью завершёнными играми.'
+                    : !rating.self_eligible ? 'Для участия завершите 10 игр.' : '';
+            } catch (error) { status.textContent = error.message; }
+            finally { leaderboardBusy = false; }
+        }
         function showScreen(next) {
             clearMessage(true);
             if (next !== 'game') stopConfetti();
@@ -575,7 +757,8 @@
             doc.body.dataset.screen = screen;
             if (screen === 'game') board.focus({preventScroll: true});
             doc.querySelectorAll('[data-action="open-stats"], [data-action="open-settings"]').forEach(button => {
-                button.setAttribute('aria-pressed', String(button.dataset.action === `open-${screen}`));
+                button.setAttribute('aria-pressed', String(button.dataset.action === `open-${screen}`
+                    || (button.dataset.action === 'open-settings' && ['rules', 'formula', 'leaderboard'].includes(screen))));
             });
         }
         function returnToGame() {
@@ -624,6 +807,10 @@
                 const changedDay = previous && previous.day !== next.day;
                 const changedRows = !previous || changedGame || signature(previous.game.guesses) !== signature(next.game.guesses);
                 state = next;
+                if (changedRows || (source === 'refresh' && previous?.game.draft !== next.game.draft)) cursor = draftCursor(next.game.draft);
+                if (next.settings && settings === null) settings = next.settings;
+                renderReminder();
+                if (serverMode && !timezoneRegistered) registerTimezone();
                 if (source !== 'draft') scheduleDayRefresh(next);
                 if (changedGame) {
                     inputQueue = [];
@@ -692,14 +879,18 @@
         function applyDraftEdit(action, letter = '') {
             if (!state || client.busy || state.game.outcome || screen !== 'game') return;
             clearMessage(true);
-            const normalized = normalizeDraft(letter);
-            const draft = action === 'delete' ? state.game.draft.slice(0, -1)
-                : normalized === null ? state.game.draft : state.game.draft + normalized;
-            if (draft.length <= WORD_LENGTH && !client.setDraft(draft)) refresh();
+            const edit = editDraftCells(state.game.draft, cursor, action, letter);
+            const previousCursor = cursor;
+            cursor = edit.cursor;
+            if (!client.setDraft(edit.draft)) { cursor = previousCursor; refresh(); }
         }
         function submitNow() {
             if (!state || client.busy || state.game.outcome || screen !== 'game') return;
             clearMessage(true);
+            if (!/^[А-Я]{5}$/u.test(state.game.draft)) {
+                showMessage('Введите пять букв');
+                return;
+            }
             client.submit().catch(error => {
                 if (['unknown_word', 'invalid_word'].includes(error.code)) showWordError();
                 else showMessage(error.message);
@@ -729,12 +920,22 @@
         doc.addEventListener('wheel', () => { if (stickyWordError) clearMessage(true); }, {passive: true});
         doc.addEventListener('click', event => {
             if (stickyWordError) clearMessage(true);
+            const cell = event.target?.closest?.('.tile--editable');
+            if (cell && state && !state.game.outcome && !client.busy && screen === 'game') {
+                cursor = Number(cell.dataset.column);
+                renderDraftRow();
+                board.focus({preventScroll: true});
+                return;
+            }
             const button = event.target?.closest?.('button');
             if (!button || button.disabled) return;
             const action = button.dataset.action;
             if (action === 'open-stats') showScreen('stats');
-            else if (action === 'open-settings') showScreen('settings');
+            else if (action === 'open-settings') { showScreen('settings'); renderReminder(); loadSettings(); }
             else if (action === 'open-rules') showScreen('rules');
+            else if (action === 'open-formula') showScreen('formula');
+            else if (action === 'open-leaderboard') { showScreen('leaderboard'); loadLeaderboard(); }
+            else if (action === 'toggle-reminder') toggleReminder();
             else if (action === 'back-settings') showScreen('settings');
             else if (action === 'back-game' || action === 'reopen-app') returnToGame();
             else if (action === 'close-app') closeApplication();
@@ -747,15 +948,24 @@
             if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
             if (event.key === 'Escape') {
                 event.preventDefault();
-                if (screen === 'rules') showScreen('settings');
+                if (['rules', 'formula', 'leaderboard'].includes(screen)) showScreen('settings');
                 else if (screen !== 'game') returnToGame();
                 return;
             }
             if (screen !== 'game') return;
-            if (event.key === 'Enter' && event.target?.closest?.('button[data-action]')) return;
-            if (event.key === 'Enter' || event.key === 'Backspace') {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                 event.preventDefault();
-                if (event.key === 'Enter') submit(); else editDraft('delete');
+                if (!state || state.game.outcome || client.busy) return;
+                if (event.key === 'Home') cursor = 0;
+                else if (event.key === 'End') cursor = WORD_LENGTH - 1;
+                else cursor = Math.max(0, Math.min(WORD_LENGTH - 1, cursor + (event.key === 'ArrowLeft' ? -1 : 1)));
+                renderDraftRow();
+                return;
+            }
+            if (event.key === 'Enter' && event.target?.closest?.('button[data-action]')) return;
+            if (event.key === 'Enter' || event.key === 'Backspace' || event.key === 'Delete') {
+                event.preventDefault();
+                if (event.key === 'Enter') submit(); else editDraft(event.key === 'Delete' ? 'clear' : 'delete');
             } else if (/^[а-яё]$/iu.test(event.key)) {
                 event.preventDefault();
                 editDraft('letter', event.key);
@@ -766,7 +976,10 @@
             event.preventDefault();
             const draft = normalizeDraft(event.clipboardData?.getData('text/plain') || '');
             if (draft === null) showMessage('Введите до пяти русских букв');
-            else if (!client.setDraft(draft)) refresh();
+            else {
+                cursor = draftCursor(draft);
+                if (!client.setDraft(draft)) refresh();
+            }
         });
         win.addEventListener('resize', () => { if (stickyWordError) positionWordError(); });
         win.addEventListener('focus', () => { if (win.performance.now() - lastRefreshAt > 1000) refresh(); });
@@ -792,6 +1005,7 @@
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             STORAGE_KEY, LocalApiError, initialScreen, normalizeDraft, parseSavedHistory,
+            correctHints, draftCursor, editDraftCells, browserTimezone, validateLeaderboard,
             createHistoryStore, preserveStorageWarning, validateState, requestApi, createGameClient, formatStatistics,
             gameIdentity, formatProgressWord, shouldCelebrate, formatCountdown, mount,
         };

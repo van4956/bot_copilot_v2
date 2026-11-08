@@ -68,7 +68,7 @@
       <div class="settings-block reminder-block">
         <div class="reminder-heading">
           <h2>Напоминание</h2>
-          <button class="reminder-switch" type="button" role="switch" aria-checked="false" aria-label="Напоминание — пока недоступно" disabled><span></span></button>
+          <button id="reminder-toggle" class="reminder-switch" type="button" role="switch" aria-checked="false" aria-label="Ежедневное напоминание сыграть" data-action="toggle-reminder" disabled><span></span></button>
         </div>
         <time id="next-word-countdown" class="next-word-countdown" aria-label="До нового слова">00:00:00</time>
         <p class="reminder-caption">до нового слова</p>
@@ -78,6 +78,64 @@
         <span class="rules-link-caption">игры «5 букв»</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
       </button>
+      <button class="settings-block rules-link" type="button" data-action="open-formula">
+        <span class="rules-link-title">Формула</span>
+        <span class="rules-link-caption">расчета очков</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+      <button class="settings-block rules-link" type="button" data-action="open-leaderboard">
+        <span class="rules-link-title">Рейтинг</span>
+        <span class="rules-link-caption">турнирная таблица</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <section id="formula-screen" class="screen screen--formula" aria-labelledby="formula-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="formula-title">Формула</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <article class="rules-content formula-content">
+        <h2>Формула расчета очков</h2>
+        <section><h3>Обозначения:</h3><ul>
+          <li><b>N</b> — всего игр.</li>
+          <li><b>P</b> — доля побед.</li>
+          <li><b>A</b> — среднее количество попыток.</li>
+          <li><b>M</b> — максимальная серия побед.</li>
+          <li><b>K</b> — общий размер словаря.</li>
+          <li><img class="formula-quality" src="assets/quality-formula.png" alt="Q = (7 − A) / 6" width="509" height="264"> — эффективность попыток.</li>
+        </ul></section>
+        <section><h3>Формула:</h3><div class="score-formula">
+          <img src="assets/score-formula.png" width="2075" height="328" alt="10000 · √(N/K) · P · (0,4 + 0,4Q + 0,2√(M/K))">
+        </div></section>
+        <section class="formula-sense"><h3>Смысл:</h3><ul>
+          <li>количество игр увеличивает очки.</li>
+          <li>доля побед влияет напрямую.</li>
+          <li>меньше попыток — выше результат.</li>
+          <li>максимальная серия даёт дополнительный, но не решающий вклад.</li>
+        </ul></section>
+        <p class="formula-note">Очки появляются после 10 завершённых игр. Незавершённые и просроченные партии в расчёт не входят. Поражения могут снижать очки.</p>
+      </article>
+    </section>
+
+    <section id="leaderboard-screen" class="screen screen--leaderboard" aria-labelledby="leaderboard-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="leaderboard-title">Рейтинг</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="leaderboard-content">
+        <p id="leaderboard-status" class="leaderboard-status" role="status">Загрузка…</p>
+        <table id="leaderboard-table" class="leaderboard-table" aria-label="Турнирная таблица за всё время" hidden>
+          <thead><tr><th scope="col">Имя</th><th scope="col">Игр</th><th scope="col">Очки</th></tr></thead>
+          <tbody id="leaderboard-rows"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="rules-screen" class="screen screen--rules" aria-labelledby="rules-title" hidden>

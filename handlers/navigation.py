@@ -101,7 +101,7 @@ async def open_words(
                         text="5БУКВ", web_app=WebAppInfo(url=url)
                     ),
                     InlineKeyboardButton(
-                        text=_("Битва Измерений"),
+                        text=_("4ПО5"),
                         callback_data="wordli_dimensions_stub",
                     ),
                 ],

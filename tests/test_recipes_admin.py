@@ -25,6 +25,7 @@ def plain_translation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Убирает зависимость модульных проверок от активного gettext-контекста."""
     monkeypatch.setattr(cookbook, "_", lambda text: text)
     monkeypatch.setattr(keyboard, "_", lambda text: text)
+    monkeypatch.setattr(admin, "_", lambda text: text)
 
 
 def _state(user_id: int = 1) -> FSMContext:

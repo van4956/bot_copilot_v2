@@ -21,6 +21,8 @@ ASSETS = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/prototype.js": ("prototype.js", "text/javascript; charset=utf-8"),
+    "/assets/score-formula.png": ("assets/score-formula.png", "image/png"),
+    "/assets/quality-formula.png": ("assets/quality-formula.png", "image/png"),
 }
 logger = logging.getLogger(__name__)
 

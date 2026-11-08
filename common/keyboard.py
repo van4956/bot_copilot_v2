@@ -171,12 +171,12 @@ def markup_num() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=" . ", callback_data="num_com"),
         ],
         [
-            InlineKeyboardButton(text="◀️ delete", callback_data="num_del"),
-            InlineKeyboardButton(text="enter ▶️", callback_data="num_enter"),
+            InlineKeyboardButton(text=_("◀️ Удалить"), callback_data="num_del"),
+            InlineKeyboardButton(text=_("Ввод ▶️"), callback_data="num_enter"),
         ],
         [
             InlineKeyboardButton(
-                text="back to main ↩️", callback_data="about_back_to_main"
+                text=_("Назад на главную ↩️"), callback_data="about_back_to_main"
             )
         ],
     ]

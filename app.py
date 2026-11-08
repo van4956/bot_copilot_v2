@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from common.comands import admin_command, private_command
+from common.comands import get_commands
 from config_data.config import (
     ROOT,
     Config,
@@ -29,6 +29,7 @@ from config_data.config import (
     validate_wordli_url,
 )
 from database.models import Base
+from database.orm_users import orm_get_locale
 from middlewares import counter, db, locale, throttle
 
 logger = logging.getLogger(__name__)
@@ -240,12 +241,17 @@ async def main(config: Config | None = None) -> None:
                 ):
                     raise RuntimeError("ID тестового бота не совпадает")
             await bot.delete_webhook(drop_pending_updates=config.drop_pending_updates)
-            await bot.set_my_commands(
-                private_command, scope=types.BotCommandScopeAllPrivateChats()
-            )
-            for admin_id in config.tg_bot.admin_list:
+            for language_code in ("", "ru", "en"):
                 await bot.set_my_commands(
-                    admin_command,
+                    get_commands(language_code or "ru"),
+                    scope=types.BotCommandScopeAllPrivateChats(),
+                    language_code=language_code,
+                )
+            for admin_id in config.tg_bot.admin_list:
+                async with sessions() as session:
+                    admin_locale = await orm_get_locale(session, admin_id) or "ru"
+                await bot.set_my_commands(
+                    get_commands(admin_locale),
                     scope=types.BotCommandScopeChat(chat_id=admin_id),
                 )
             await notify_service(bot, config, "🤖 Бот запущен")

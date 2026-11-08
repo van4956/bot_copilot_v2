@@ -45,7 +45,7 @@ async def test_runtime_schema_check_does_not_create_missing_tables(database) -> 
 
 
 async def test_explicit_migration_is_idempotent_and_preserves_other_tables(database) -> None:
-    """Создаются только две таблицы, данные других функций не затрагиваются."""
+    """Создаются только игровые таблицы, данные других функций не меняются."""
     async with database.begin() as connection:
         await connection.exec_driver_sql("create table other_data (value integer not null)")
         await connection.exec_driver_sql("insert into other_data values (42)")
@@ -58,7 +58,9 @@ async def test_explicit_migration_is_idempotent_and_preserves_other_tables(datab
     await assert_schema(database)
     async with database.connect() as connection:
         names = await connection.run_sync(lambda conn: inspect(conn).get_table_names())
-        assert set(names) == {"other_data", "wordli_profiles", "wordli_requests"}
+        assert set(names) == {
+            "other_data", "wordli_profiles", "wordli_requests", "wordli_settings"
+        }
         assert (await connection.exec_driver_sql("select value from other_data")).scalar() == 42
         assert (
             await connection.exec_driver_sql("select revision from wordli_profiles")
@@ -133,11 +135,12 @@ async def test_runtime_rejects_each_administrative_role_flag(index: int) -> None
         ([True], "DDL"),
         ([False, False], "права таблицы"),
         ([False, True, False], "права таблицы"),
-        ([False, True, True, True], "посторонние"),
+        ([False, True, True, False], "права таблицы"),
+        ([False, True, True, True, True], "посторонние"),
     ],
 )
 async def test_runtime_rejects_excess_or_missing_privileges(values: list, match: str) -> None:
-    """Разрешены только чтение и запись двух игровых таблиц."""
+    """Разрешены только чтение и запись игровых таблиц."""
     with pytest.raises(WordliSchemaError, match=match):
         await assert_runtime_permissions(_permissions_engine((False,) * 5, values))
 
@@ -145,7 +148,7 @@ async def test_runtime_rejects_excess_or_missing_privileges(values: list, match:
 async def test_runtime_accepts_only_limited_wordli_permissions() -> None:
     """Минимальные права Wordli достаточны для запуска."""
     await assert_runtime_permissions(
-        _permissions_engine((False,) * 5, [False, True, True, False])
+        _permissions_engine((False,) * 5, [False, True, True, True, False])
     )
 
 

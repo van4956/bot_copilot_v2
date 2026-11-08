@@ -51,6 +51,22 @@ function makeClient(handler, options = {}) {
     return {client, calls, states, messages, busy};
 }
 
+test('серверный клиент сохраняет и восстанавливает пустые позиции черновика', async () => {
+    let stored = stateFor({draft: ' А К'});
+    const {client, calls} = makeClient(async (endpoint, payload) => {
+        if (endpoint === '/api/draft') stored = stateFor({draft: payload.draft, revision: stored.revision + 1});
+        return structuredClone(stored);
+    });
+    await client.refresh();
+    assert.equal(client.state.game.draft, ' А К');
+    assert.equal(client.setDraft('   К'), true);
+    await client.flush();
+    assert.equal(calls.find(call => call.endpoint === '/api/draft').payload.draft, '   К');
+    assert.equal(client.state.game.draft, '   К');
+    await client.refresh();
+    assert.equal(client.state.game.draft, '   К');
+});
+
 test('исчерпанный серверный профиль не отправляет черновик или новую партию', async () => {
     const state = stateFor();
     state.game.status = 'exhausted';

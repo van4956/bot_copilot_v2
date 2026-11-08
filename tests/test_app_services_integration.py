@@ -99,7 +99,10 @@ async def test_application_starts_and_closes_real_services(
 
     bot.get_me.assert_awaited_once()
     bot.delete_webhook.assert_awaited_once_with(drop_pending_updates=False)
-    bot.set_my_commands.assert_awaited_once()
+    assert bot.set_my_commands.await_count == 3
+    assert [
+        call.kwargs["language_code"] for call in bot.set_my_commands.await_args_list
+    ] == ["", "ru", "en"]
     bot.session.close.assert_awaited_once()
     assert bot.http_session.closed
     resources["dispatcher"].start_polling.assert_awaited_once()

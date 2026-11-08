@@ -10,14 +10,16 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from aiohttp import web
+from dotenv import dotenv_values
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from config_data.config import load_config, validate_test_database
 
 from .engine import GameError, LocalGameEngine
+from .reminders import parse_reminders_flag, reminder_service
 from .storage import WordliStorage
 from .telegram_auth import MAX_TELEGRAM_USER_ID, validate_init_data
 
@@ -29,9 +31,13 @@ STATIC_ASSETS = {
     "/styles.css": ("styles.css", "text/css"),
     "/prototype.js": ("prototype.js", "text/javascript"),
     "/telegram_client.js": ("telegram_client.js", "text/javascript"),
+    "/assets/score-formula.png": ("assets/score-formula.png", "image/png"),
+    "/assets/quality-formula.png": ("assets/quality-formula.png", "image/png"),
 }
 API_FIELDS = {
     "/api/state": set(),
+    "/api/settings": {"timezone", "reminder_enabled"},
+    "/api/leaderboard": set(),
     "/api/guess": {"day", "index", "guess", "revision", "request_id"},
     "/api/next": {"day", "index", "revision", "request_id"},
     "/api/draft": {"day", "index", "draft", "revision"},
@@ -40,8 +46,7 @@ CLIENT_SCRIPT = '<script src="prototype.js" defer></script>'
 TELEGRAM_SCRIPTS = (
     '<script src="https://telegram.org/js/telegram-web-app.js?64"></script>'
     "\n  <script>window.WORDLI_MODE='telegram';</script>"
-    '\n  <script src="telegram_client.js" defer></script>\n  '
-    + CLIENT_SCRIPT
+    '\n  <script src="telegram_client.js" defer></script>\n  ' + CLIENT_SCRIPT
 )
 SAFE_HEADERS = {
     "Cache-Control": "no-store",
@@ -82,9 +87,7 @@ def _origin(value: str) -> str:
     return f"https://{parsed.netloc.lower()}"
 
 
-def _json_response(
-    payload: dict[str, Any], status: int = 200
-) -> web.Response:
+def _json_response(payload: dict[str, Any], status: int = 200) -> web.Response:
     """Формирует JSON без кеширования и разрешений CORS."""
     return web.Response(
         text=json.dumps(payload, ensure_ascii=False, allow_nan=False),
@@ -115,40 +118,39 @@ def _unique_json(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 async def _read_payload(request: web.Request) -> dict[str, Any]:
     """Ограничивает размер и строго разбирает JSON-объект хода."""
-    if (
-        request.content_length is not None
-        and request.content_length > MAX_BODY_BYTES
-    ):
+    if request.content_length is not None and request.content_length > MAX_BODY_BYTES:
         raise GameError("request_too_large", "Запрос слишком большой.", 413)
     if request.content_type != "application/json":
         raise GameError("invalid_content_type", "Ожидается JSON-запрос.", 415)
     try:
         raw = await request.read()
         if len(raw) > MAX_BODY_BYTES:
-            raise GameError(
-                "request_too_large", "Запрос слишком большой.", 413
-            )
-        payload = json.loads(
-            raw.decode("utf-8"), object_pairs_hook=_unique_json
-        )
+            raise GameError("request_too_large", "Запрос слишком большой.", 413)
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json)
     except GameError:
         raise
     except web.HTTPRequestEntityTooLarge:
-        raise GameError(
-            "request_too_large", "Запрос слишком большой.", 413
-        ) from None
+        raise GameError("request_too_large", "Запрос слишком большой.", 413) from None
     except (ValueError, UnicodeError, RecursionError):
-        raise GameError(
-            "invalid_json", "Некорректный JSON-запрос.", 400
-        ) from None
+        raise GameError("invalid_json", "Некорректный JSON-запрос.", 400) from None
     if not isinstance(payload, dict):
         raise GameError("invalid_request", "Ожидается объект запроса.", 400)
     expected = API_FIELDS[request.path]
-    if set(payload) != expected:
-        raise GameError(
-            "invalid_request", "Некорректные поля запроса.", 400
-        )
+    if (
+        request.path == "/api/settings"
+        and not set(payload).issubset(expected)
+        or request.path != "/api/settings"
+        and set(payload) != expected
+    ):
+        raise GameError("invalid_request", "Некорректные поля запроса.", 400)
     return payload
+
+
+def _telegram_display_name(init_data: str) -> str:
+    """Читает имя только после успешной проверки всей подписи initData."""
+    user = json.loads(dict(parse_qsl(init_data))["user"])
+    parts = [user.get("first_name"), user.get("last_name")]
+    return " ".join(part for part in parts if isinstance(part, str)) or "Игрок"
 
 
 def create_app(
@@ -178,15 +180,15 @@ def create_app(
     ):
         message = (
             "Не подтверждён идентификатор рабочего бота"
-            if production else "Не подтверждён идентификатор тестового бота"
+            if production
+            else "Не подтверждён идентификатор тестового бота"
         )
         raise ValueError(message)
     if not (production and allowed_user_ids is None) and (
         not isinstance(allowed_user_ids, set)
         or not allowed_user_ids
         or any(
-            type(user_id) is not int
-            or not 0 < user_id <= MAX_TELEGRAM_USER_ID
+            type(user_id) is not int or not 0 < user_id <= MAX_TELEGRAM_USER_ID
             for user_id in allowed_user_ids
         )
     ):
@@ -218,9 +220,7 @@ def create_app(
         if request.path.startswith("/api/") and (
             len(origins) > 1 or origins and origins[0] != origin
         ):
-            raise GameError(
-                "invalid_origin", "Запрос с другого сайта запрещён.", 403
-            )
+            raise GameError("invalid_origin", "Запрос с другого сайта запрещён.", 403)
 
     async def api_response(request: web.Request) -> web.Response:
         """Проверяет личность до обращения к истории в тестовой БД."""
@@ -231,18 +231,41 @@ def create_app(
                 raise GameError(
                     "authentication_failed",
                     "Откройте игру заново через кнопку «5БУКВ» бота."
-                    if production else "Откройте игру заново через тестового бота.",
+                    if production
+                    else "Откройте игру заново через тестового бота.",
                     401,
                 )
             identity = validate_init_data(tokens[0], bot_token, now=get_time())
             if allowed is not None and identity.user_id not in allowed:
-                raise GameError(
-                    "access_denied", "Игра пока недоступна.", 403
-                )
+                raise GameError("access_denied", "Игра пока недоступна.", 403)
             user_id = identity.user_id
             payload = await _read_payload(request)
             if request.path == "/api/state":
                 state = await storage.bootstrap(user_id)
+                state["settings"] = await storage.settings(
+                    user_id, display_name=_telegram_display_name(tokens[0])
+                )
+            elif request.path == "/api/settings":
+                if (
+                    "timezone" in payload
+                    and not isinstance(payload["timezone"], str)
+                    or "reminder_enabled" in payload
+                    and type(payload["reminder_enabled"]) is not bool
+                ):
+                    raise GameError("invalid_settings", "Некорректные настройки.")
+                state = {
+                    "settings": await storage.settings(
+                        user_id,
+                        display_name=_telegram_display_name(tokens[0]),
+                        timezone_name=payload.get("timezone"),
+                        reminder_enabled=payload.get("reminder_enabled"),
+                    )
+                }
+            elif request.path == "/api/leaderboard":
+                await storage.settings(
+                    user_id, display_name=_telegram_display_name(tokens[0])
+                )
+                state = {"leaderboard": await storage.leaderboard(user_id)}
             elif request.path == "/api/guess":
                 state = await storage.submit(user_id, **payload)
             elif request.path == "/api/next":
@@ -257,11 +280,17 @@ def create_app(
                     "Откройте игру заново через кнопку «5БУКВ» бота.",
                     error.status,
                 )
-            if user_id is not None and error.status == 409 and error.code in {
-                "version_conflict", "game_changed", "day_changed"
-            }:
+            if (
+                user_id is not None
+                and error.status == 409
+                and error.code in {"version_conflict", "game_changed", "day_changed"}
+            ):
                 try:
-                    state = response_state(await storage.bootstrap(user_id))
+                    current = await storage.bootstrap(user_id)
+                    current["settings"] = await storage.settings(
+                        user_id, display_name=_telegram_display_name(tokens[0])
+                    )
+                    state = response_state(current)
                     return _json_response(
                         {
                             "error": {
@@ -306,9 +335,9 @@ def create_app(
                     text = content.decode("utf-8")
                     if text.count(CLIENT_SCRIPT) != 1:
                         raise ValueError("Missing client entrypoint")
-                    content = text.replace(
-                        CLIENT_SCRIPT, TELEGRAM_SCRIPTS
-                    ).encode("utf-8")
+                    content = text.replace(CLIENT_SCRIPT, TELEGRAM_SCRIPTS).encode(
+                        "utf-8"
+                    )
                 return web.Response(
                     body=content,
                     content_type=content_type,
@@ -319,9 +348,7 @@ def create_app(
                 if request.path not in API_FIELDS:
                     raise GameError("not_found", "Запрос не найден.", 404)
                 return await api_response(request)
-            raise GameError(
-                "method_not_allowed", "Метод не поддерживается.", 405
-            )
+            raise GameError("method_not_allowed", "Метод не поддерживается.", 405)
         except GameError as error:
             return _error_response(error)
         except Exception:
@@ -345,6 +372,14 @@ def main() -> None:
         parser.error("Сервер игры разрешён только при APP_ENV=test")
     if not 1 <= args.port <= 65535:
         parser.error("Порт должен быть в пределах 1–65535")
+    values = dict(dotenv_values(args.env_file))
+    values.update(os.environ)
+    try:
+        reminders_enabled = parse_reminders_flag(
+            values.get("WORDLI_REMINDERS_ENABLED", "false")
+        )
+    except ValueError as error:
+        parser.error(str(error))
     config = load_config(args.env_file)
     if not config.test_mode:
         parser.error("Сервер игры разрешён только в тестовом режиме")
@@ -363,7 +398,17 @@ def main() -> None:
         """Создаёт только таблицы игры и закрывает свой пул соединений."""
         try:
             await storage.init_schema()
-            yield
+            if reminders_enabled:
+                async with reminder_service(
+                    storage,
+                    config.tg_bot.token_test,
+                    allowed_user_ids=(
+                        set(config.tg_bot.owner) | set(config.tg_bot.admin_list)
+                    ),
+                ):
+                    yield
+            else:
+                yield
         finally:
             await database.dispose()
 

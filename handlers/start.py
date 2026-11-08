@@ -14,10 +14,12 @@ from aiogram.filters import (
 )
 from aiogram.fsm.context import FSMContext
 from aiogram.types import ChatMemberUpdated, FSInputFile, Message
+from aiogram.utils.i18n import FSMI18nMiddleware
 from aiogram.utils.i18n import gettext as _
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
+from common.comands import sync_user_commands
 from database.orm_users import (
     SUPPORTED_LOCALES,
     orm_add_user,
@@ -56,6 +58,7 @@ async def start_cmd(
     bot: Bot,
     state: FSMContext,
     workflow_data: dict[str, Any],
+    i18n_middleware: FSMI18nMiddleware | None = None,
 ) -> None:
     """Сначала регистрирует пользователя, затем показывает интерфейс."""
     actor = message.from_user
@@ -78,7 +81,9 @@ async def start_cmd(
     )
     await state.set_state(None)
     await state.set_data({"locale": user.locale})
-    user_label = escape(actor.username or actor.full_name or "Пользователь")
+    if i18n_middleware is not None:
+        await i18n_middleware.set_locale(state, user.locale)
+    user_label = escape(actor.username or actor.full_name or _("Пользователь"))
     if created:
         try:
             await message.answer_photo(
@@ -102,6 +107,8 @@ async def start_cmd(
     await message.answer(
         _("Бот активирован!"), reply_markup=keyboard.start_keyboard(bot=bot)
     )
+    if isinstance(bot, Bot):
+        await sync_user_commands(bot, actor.id, user.locale)
 
 
 @start_router.my_chat_member(
@@ -135,7 +142,7 @@ async def process_user_unblocked_bot(
     if user is None:
         return
     await orm_update_status(session, event.chat.id, "member")
-    full_name = escape(event.from_user.full_name or "Пользователь")
+    full_name = escape(event.from_user.full_name or _("Пользователь"))
     try:
         await bot.send_message(
             chat_id=event.chat.id,

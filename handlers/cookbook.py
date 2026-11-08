@@ -38,11 +38,12 @@ def format_recipe_caption(recipe: Any) -> str:
     """Создаёт экранированную подпись, не разрезая HTML-разметку."""
     name = _clip_text(str(recipe.recipe_name or ""), 150)
     author = _clip_text(str(recipe.author or ""), 150)
-    heading = f"{name}\nАвтор: {author}\n\n"
+    author_label = _("Автор:")
+    heading = f"{name}\n{author_label} {author}\n\n"
     remaining = 1024 - len(heading.encode("utf-16-le")) // 2
     description = _clip_text(str(recipe.description or ""), remaining)
     return (
-        f"<b>{escape(name)}</b>\n<i>Автор: {escape(author)}</i>\n\n"
+        f"<b>{escape(name)}</b>\n<i>{escape(author_label)} {escape(author)}</i>\n\n"
         f"{escape(description)}"
     )
 

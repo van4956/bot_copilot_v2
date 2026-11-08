@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 \getenv wordli_password WORDLI_APP_PASSWORD
 
--- создаём отдельную роль только после явной миграции двух игровых таблиц
+-- создаём отдельную роль только после явной миграции игровых таблиц
 select exists(select 1 from pg_roles where rolname = 'copilot_wordli') as role_exists \gset
 \if :role_exists
 \echo 'Role copilot_wordli already exists; its password is not changed.'
@@ -21,4 +21,4 @@ $$;
 -- не меняем общие права public и не выдаём доступ к данным других функций
 grant connect on database :"DBNAME" to copilot_wordli;
 grant usage on schema public to copilot_wordli;
-grant select, insert, update on table public.wordli_profiles, public.wordli_requests to copilot_wordli;
+grant select, insert, update on table public.wordli_profiles, public.wordli_requests, public.wordli_settings to copilot_wordli;

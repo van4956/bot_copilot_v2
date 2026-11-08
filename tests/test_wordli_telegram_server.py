@@ -620,6 +620,23 @@ async def test_telegram_scripts_are_injected_only_in_authenticated_server(
         assert asset.headers["Cache-Control"] == "no-store"
 
 
+@pytest.mark.parametrize("name", ["score-formula", "quality-formula"])
+async def test_formula_images_are_available(
+    app_environment: AppEnvironment, name: str
+) -> None:
+    """Разрешает готовые формулы без раскрытия каталогов и генератора."""
+    response = await request(
+        app_environment.app, "GET", f"/assets/{name}.png"
+    )
+    assert response.status == 200
+    assert response.content_type == "image/png"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.body.startswith(b"\x89PNG\r\n\x1a\n")
+    for path in ("/assets/", "/testing/generate_wordli_formula.py"):
+        private = await request(app_environment.app, "GET", path)
+        assert private.status == 404
+
+
 @pytest.mark.parametrize("method", ["OPTIONS", "PUT", "DELETE"])
 async def test_preflight_and_other_methods_do_not_enable_cors(
     app_environment: AppEnvironment, method: str

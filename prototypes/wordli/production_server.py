@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from .engine import LocalGameEngine
 from .production_schema import assert_runtime_permissions, assert_schema
+from .reminders import parse_reminders_flag, reminder_service
 from .storage import WordliStorage
 from .telegram_auth import MAX_TELEGRAM_USER_ID
 from .telegram_server import _origin, create_app
@@ -36,6 +37,7 @@ class ProductionConfig:
     expected_bot_id: int
     access: str = "restricted"
     allowed_user_ids: frozenset[int] = field(default_factory=frozenset, repr=False)
+    reminders_enabled: bool = False
 
 
 def load_production_config(
@@ -101,6 +103,9 @@ def load_production_config(
         ):
             raise ValueError("Нужен непустой WORDLI_ALLOWED_USER_IDS для restricted")
         allowed = frozenset(map(int, parts))
+    reminders_enabled = parse_reminders_flag(
+        values.get("WORDLI_REMINDERS_ENABLED", "false")
+    )
     return ProductionConfig(
         public_origin=origin,
         database_url=database_url,
@@ -108,6 +113,7 @@ def load_production_config(
         expected_bot_id=int(identifier),
         access=access,
         allowed_user_ids=allowed,
+        reminders_enabled=reminders_enabled,
     )
 
 
@@ -149,7 +155,17 @@ def create_production_app(config: ProductionConfig) -> web.Application:
         try:
             await assert_schema(database)
             await assert_runtime_permissions(database)
-            yield
+            if config.reminders_enabled:
+                async with reminder_service(
+                    storage,
+                    config.bot_token,
+                    allowed_user_ids=(
+                        None if config.access == "all" else config.allowed_user_ids
+                    ),
+                ):
+                    yield
+            else:
+                yield
         finally:
             await database.dispose()
 

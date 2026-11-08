@@ -97,6 +97,9 @@ async def request(
 def storage() -> SimpleNamespace:
     """Создаёт хранилище-заглушку с приватным ответом в истории."""
     return SimpleNamespace(
+        settings=AsyncMock(return_value={
+            "timezone": "Etc/GMT-4", "reminder_enabled": False,
+        }),
         bootstrap=AsyncMock(return_value={
             "history": [{"answer": "КОШКА"}],
             "game": {"answer": None, "outcome": None},

@@ -53,10 +53,12 @@ test('query выбирает только навигацию, не подмен�
 });
 
 test('ввод нормализует Ё, но не принимает латиницу, числа и лишние буквы', () => {
-    assert.equal(ui.normalizeDraft('  ёжик  '), 'ЕЖИК');
+    assert.equal(ui.normalizeDraft('ёжик  '), 'ЕЖИК');
+    assert.equal(ui.normalizeDraft(' е'), ' Е');
+    assert.equal(ui.normalizeDraft('КО ШК'), 'КО ШК');
     assert.equal(ui.normalizeDraft('елка\u0301'), null);
     assert.equal(ui.normalizeDraft(''), '');
-    for (const value of ['КОШКАА', 'КOШКА', '12345', 'КО ШК', null]) assert.equal(ui.normalizeDraft(value), null);
+    for (const value of ['КОШКАА', 'КOШКА', '12345', '  ёжик  ', '\tКОТ', null]) assert.equal(ui.normalizeDraft(value), null);
 });
 
 test('локальное сохранение имеет отдельное имя и явную версию', () => {

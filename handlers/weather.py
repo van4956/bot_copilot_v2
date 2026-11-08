@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import math
 from html import escape
 
 import aiohttp
@@ -16,6 +17,7 @@ from aiogram.utils.i18n import lazy_gettext as __
 from common import keyboard
 from common.http import ExternalServiceError, get_json
 from filters.chat_type import ChatTypeFilter
+from handlers.navigation import open_main, reset_dialog
 
 logger = logging.getLogger(__name__)
 
@@ -23,19 +25,14 @@ logger = logging.getLogger(__name__)
 weather_router = Router()
 weather_router.message.filter(ChatTypeFilter(["private"]))
 
-# api токен для сайта погоды
 
-
-# Определяем класс состояния прогноза погоды
 class City(StatesGroup):
-    """Класс состояния прогноза погоды"""
+    """Выбор способа и ручной ввод населённого пункта."""
 
     forecast_moment = State()
     forecast_period = State()
-    city_name_moment = State()  # Состояние, в котором бот ожидает ввода названия города для прогноза в текущем моменте
-    city_name_period = (
-        State()
-    )  # Состояние, в котором бот ожидает ввода названия города для прогноза на период
+    city_name_moment = State()
+    city_name_period = State()
 
 
 dict_weather_descriptions = {
@@ -166,25 +163,88 @@ BACK_TO_MAIN = __("Назад на главную ↩️")
 CITY_BY_NAME = __("По названию 🏙")
 
 
-# кнопка "погода"
-@weather_router.message(F.text == WATER)
-async def water_cmd(message: Message, workflow_data: dict):
+async def _ask_location_method(message: Message, state: FSMContext) -> None:
+    """Запрашивает город или геолокацию для прогноза на три дня."""
+    await state.set_state(City.forecast_period)
     await message.answer(
-        _("Выберите период прогноза"),
+        _("Каким способом определить прогноз?"),
         reply_markup=keyboard.get_keyboard(
-            _("Текущий ⏺"),
-            _("На 3 дня ⏩"),
+            _("По названию 🏙"),
+            _("По локации 🗺"),
             _("Назад на главную ↩️"),
-            sizes=(
-                2,
-                1,
-            ),
+            request_location=1,
+            sizes=(2, 1),
             placeholder="⬇️",
         ),
     )
 
 
-# Функция получения погоды через OpenWeatherMap
+@weather_router.message(F.text == WATER)
+async def water_cmd(message: Message, state: FSMContext) -> None:
+    """Открывает погоду с трёхдневным прогнозом по умолчанию."""
+    await reset_dialog(state)
+    await _ask_location_method(message, state)
+
+
+def _finite_number(value: object) -> float:
+    """Проверяет числовые значения внешнего сервиса."""
+    if isinstance(value, bool):
+        raise ValueError("Ожидалось число")
+    result = float(value)
+    if not math.isfinite(result):
+        raise ValueError("Ожидалось конечное число")
+    return result
+
+
+def _wind_direction(degrees: object) -> str:
+    """Показывает направление движения ветра, а не его источник."""
+    try:
+        direction = (_finite_number(degrees) + 180) % 360
+    except (TypeError, ValueError, OverflowError):
+        return "—"
+    # Стандартные эмодзи-стрелки поддерживаются шрифтами мобильного Telegram.
+    arrows = ("⬆️", "↗️", "➡️", "↘️", "⬇️", "↙️", "⬅️", "↖️")
+    return arrows[int((direction + 22.5) // 45) % 8]
+
+
+def _weather_values(entry: dict) -> tuple[str, str, str, str, str]:
+    """Подготавливает столбцы, сохраняя реальные значения погоды."""
+    return (
+        f"{_finite_number(entry['main']['temp']):.1f}",
+        f"{_finite_number(entry['main']['humidity']):g}",
+        f"{_finite_number(entry['wind']['speed']):.1f}",
+        _wind_direction(entry["wind"].get("deg")),
+        dict_weather_icon.get(entry["weather"][0]["icon"], "❓"),
+    )
+
+
+def _numeric_row(
+    values: tuple[str, str, str, str, str],
+    temperature_width: int | None = None,
+    *,
+    current: bool = False,
+) -> str:
+    """Выравнивает только температуру, оставляя остальное обычным текстом."""
+    temperature, humidity, wind, direction, _ = values
+    unit = "°C" if current else "°"
+    width = len(temperature) if temperature_width is None else temperature_width
+    return (
+        f"<code>{temperature:>{width}}{unit}</code> | "
+        f"{humidity}% | {wind}𝑣 | {direction}"
+    )
+
+
+def _weather_header(name: object, coordinates: dict) -> str:
+    """Оставляет город обычным текстом, а координаты — моноширинными."""
+    latitude, longitude = coordinates["lat"], coordinates["lon"]
+    _finite_number(latitude)
+    _finite_number(longitude)
+    return (
+        f"{escape(str(name))}\n"
+        f"<code>{escape(str(latitude))}° {escape(str(longitude))}°</code>"
+    )
+
+
 async def parse_weather_data(
     type_forecast: int,
     city: str | None,
@@ -222,281 +282,160 @@ async def parse_weather_data(
 
     try:
         if type_forecast == 1:
-            temp = data["main"]["temp"]  # Температура
-            humidity = data["main"]["humidity"]  # Влажность, %
-            wind = data["wind"]["speed"]  # Скорость ветра, метр/сек
-            pressure = data["main"]["pressure"]  # Давление, мм.рт.ст.
-            dt = data["dt"]  # Время расчета данных, unix, UTC
-            timezone = data["timezone"]  # Сдвиг в секундах от UTC
-            dt_object = datetime.datetime.fromtimestamp(
-                dt + timezone, tz=datetime.timezone.utc
-            )  # Конвертация в читаемый формат
-            time = dt_object.strftime(
-                "%d-%m-%Y  %H:%M"
-            )  # Форматирование даты и времени в желаемый вид
-            name = escape(str(data["name"]))  # Название города
-            lon = data["coord"]["lon"]
-            lat = data["coord"]["lat"]
-            # description = data['weather'][0]['description']
-            icon = data["weather"][0]["icon"]
-            # emoji = dict_weather_descriptions.get(description, description)
-            emoji = dict_weather_icon.get(icon, "❓")
-
-            result = (
-                f"<code>{name}</code>\n<code>{lat}° {lon}°</code>\n\n"
-                f"<code>{str(round(temp, 1))}°C | {str(humidity)}% | {str(round(wind, 1))}𝑣 | {str(pressure)}</code>\n{emoji}\n\n"
-                f"<code>{time}</code>"
+            moment = datetime.datetime.fromtimestamp(
+                data["dt"] + data["timezone"], tz=datetime.timezone.utc
+            )
+            values = _weather_values(data)
+            header = _weather_header(data["name"], data["coord"])
+            return (
+                f"{header}\n\n"
+                f"{_numeric_row(values, current=True)} {values[4]}\n\n"
+                f"{moment:%d-%m-%Y  %H:%M}"
             )
 
-            return result
-
-        elif type_forecast == 2:
-            result = []
-            city = escape(str(data["city"]["name"]))
-            lat = data["city"]["coord"]["lat"]
-            lon = data["city"]["coord"]["lon"]
-            text_head = f"<code>{city}</code>\n<code>{lat}° {lon}°</code>"
-            result.append(text_head)
-
-            timezone = data["city"]["timezone"]
-            weather_list = data["list"]
-            day = 0
-            cnt_day = 0
-            for entry in weather_list:
-                dt_obj = datetime.datetime.fromtimestamp(
-                    entry["dt"] + timezone, tz=datetime.timezone.utc
-                )
-                dt = dt_obj.strftime("%d.%m %H:%M")
-                temp_celsius = round(entry["main"]["temp"], 1)
-                humidity = entry["main"]["humidity"]
-                # description = entry['weather'][0]['description']
-                icon = entry["weather"][0]["icon"]
-                # emoji = dict_weather_descriptions.get(description, description)
-                emoji = dict_weather_icon.get(icon, "❓")
-                wind_speed = round(entry["wind"]["speed"], 1)
-                pressure = entry["main"]["pressure"]
-                text = f"{dt[6:]} | {temp_celsius}° | {humidity}% | {wind_speed}𝑣 | {str(pressure)} | {emoji}"
-
-                if day != int(dt[:2]):
-                    day = int(dt[:2])
-                    text = "\n" + str(dt[:5]) + "\n" + text
-                    cnt_day += 1
-
-                # оставляем только 4 дня в отчете
-                if cnt_day > 3:
+        city_data = data["city"]
+        header = _weather_header(city_data["name"], city_data["coord"])
+        rows = []
+        dates = []
+        for entry in data["list"]:
+            moment = datetime.datetime.fromtimestamp(
+                entry["dt"] + city_data["timezone"], tz=datetime.timezone.utc
+            )
+            if moment.date() not in dates:
+                if len(dates) == 3:
                     break
-
-                result.append(text)
-
-            result = "\n".join(result)
-
-            return result
-
-    except (KeyError, IndexError, TypeError, ValueError, OverflowError):
+                dates.append(moment.date())
+            rows.append((moment, _weather_values(entry)))
+        if not rows:
+            raise ValueError("Пустой прогноз")
+        # Ширина температуры едина для всех трёх дней, без лишнего запаса.
+        temperature_width = max(len(values[0]) for _, values in rows)
+        result = [header]
+        previous_date = None
+        for moment, values in rows:
+            if moment.date() != previous_date:
+                result.append(f"\n{moment:%d.%m}")
+                previous_date = moment.date()
+            line = f"{moment:%H:%M} | {_numeric_row(values, temperature_width)}"
+            result.append(f"{line} {values[4]}")
+        return "\n".join(result)
+    except (KeyError, IndexError, TypeError, ValueError, OverflowError, AttributeError):
         logger.warning("Некорректный ответ сервиса погоды")
-        text = _("Сервис погоды вернул некорректный ответ")
-        return text
+        return _("Сервис погоды вернул некорректный ответ")
+
+
+async def _show_forecast(
+    message: Message,
+    state: FSMContext,
+    location: dict,
+) -> None:
+    """Показывает три дня и возвращает главную даже при отказе погодного API."""
+    data = await state.get_data()
+    await reset_dialog(state)
+    weather_info = await parse_weather_data(
+        2,
+        city=location.get("city"),
+        lat=location.get("lat"),
+        lon=location.get("lon"),
+        locale=data.get("locale"),
+        api_key=getattr(message.bot, "api_weather", ""),
+        session=getattr(message.bot, "http_session", None),
+    )
+    await message.answer(weather_info, parse_mode=ParseMode.HTML)
+    await open_main(message, state)
 
 
 @weather_router.message(F.text == CURRENT)
-async def water_moment_cmd(message: Message, state: FSMContext):
-    await state.set_state(City.forecast_moment)
-    await message.answer(
-        _("Каким способом определить прогноз?"),
-        reply_markup=keyboard.get_keyboard(
-            _("По названию 🏙"),
-            _("По локации 🗺"),
-            _("Назад на главную ↩️"),
-            request_location=1,
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
-    )
+async def water_moment_cmd(message: Message, state: FSMContext) -> None:
+    """Убирает старую кнопку периода, не запрашивая новую погоду."""
+    await open_main(message, state)
 
 
 @weather_router.message(F.text == FOR_3_DAYS)
-async def water_period_cmd(message: Message, state: FSMContext):
-    await state.set_state(City.forecast_period)
+async def water_period_cmd(message: Message, state: FSMContext) -> None:
+    """Возвращает главную вместо прежнего выбора периода."""
+    await open_main(message, state)
+
+
+async def _ask_city_name(message: Message, state: FSMContext, target: State) -> None:
+    """Разрешает ручной ввод города только на соответствующем шаге."""
     await message.answer(
-        _("Каким способом определить прогноз?"),
-        reply_markup=keyboard.get_keyboard(
-            _("По названию 🏙"),
-            _("По локации 🗺"),
-            _("Назад на главную ↩️"),
-            request_location=1,
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
+        _("Введите название населенного пункта"), reply_markup=keyboard.del_kb
     )
-
-
-# =====================================< Текущий ⏺ >======================================================
+    await state.set_state(target)
 
 
 @weather_router.message(City.forecast_moment, F.text == CITY_BY_NAME)
-async def city_message_moment(message: Message, state: FSMContext):
-    await message.answer(
-        _("Введите название населенного пункта"), reply_markup=keyboard.del_kb
-    )
-    await state.set_state(City.city_name_moment)
-
-
-@weather_router.message(City.city_name_moment, F.text)
-async def process_city_moment(message: Message, state: FSMContext):
-    await state.update_data(city_name_moment=message.text)
-    city_name_moment = message.text
-    data_state = await state.get_data()
-    user_locale = data_state.get("locale")
-    weather_info = await parse_weather_data(
-        1,
-        city=city_name_moment,
-        lat=None,
-        lon=None,
-        locale=user_locale,
-        api_key=getattr(message.bot, "api_weather", ""),
-        session=getattr(message.bot, "http_session", None),
-    )
-    await state.set_state(None)
-    await state.update_data(city_name_moment=None)
-    await message.answer(weather_info, parse_mode=ParseMode.HTML)
-    await message.answer(
-        _("Выберите период прогноза"),
-        reply_markup=keyboard.get_keyboard(
-            _("Текущий ⏺"),
-            _("На 3 дня ⏩"),
-            _("Назад на главную ↩️"),
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
-    )
-
-
-@weather_router.message(City.city_name_moment)
-async def process_city_moment_(message: Message):
-    await message.answer(
-        _("Вы ввели не допустимые данные, введите название населенного пункта")
-    )
-
-
-# =====================================< На 3 дня ⏩ >======================================================
+async def city_message_moment(message: Message, state: FSMContext) -> None:
+    """Продолжает старый диалог, переводя его на прогноз трёх дней."""
+    await _ask_city_name(message, state, City.city_name_period)
 
 
 @weather_router.message(City.forecast_period, F.text == CITY_BY_NAME)
-async def city_message_period(message: Message, state: FSMContext):
+async def city_message_period(message: Message, state: FSMContext) -> None:
+    """Запрашивает город для прогноза на три дня."""
+    await _ask_city_name(message, state, City.city_name_period)
+
+
+async def _process_city(message: Message, state: FSMContext) -> None:
+    """Запрашивает прогноз по введённому названию."""
+    city = (message.text or "").strip()
+    if not city:
+        await message.answer(
+            _("Вы ввели не допустимые данные, введите название населенного пункта")
+        )
+        return
+    await _show_forecast(message, state, {"city": city[:100]})
+
+
+@weather_router.message(City.city_name_moment, F.text)
+async def process_city_moment(message: Message, state: FSMContext) -> None:
+    """Завершает старый ввод города прогнозом на три дня."""
+    await _process_city(message, state)
+
+
+@weather_router.message(City.city_name_moment)
+async def process_city_moment_(message: Message) -> None:
+    """Сообщает о неверном формате города."""
     await message.answer(
-        _("Введите название населенного пункта"), reply_markup=keyboard.del_kb
+        _("Вы ввели не допустимые данные, введите название населенного пункта")
     )
-    await state.set_state(City.city_name_period)
 
 
 @weather_router.message(City.city_name_period, F.text)
-async def process_city_period(message: Message, state: FSMContext):
-    await state.update_data(city_name_period=message.text)
-    city_name_period = message.text
-    data_state = await state.get_data()
-    user_locale = data_state.get("locale")
-    weather_info = await parse_weather_data(
-        2,
-        city=city_name_period,
-        lat=None,
-        lon=None,
-        locale=user_locale,
-        api_key=getattr(message.bot, "api_weather", ""),
-        session=getattr(message.bot, "http_session", None),
-    )
-    await state.set_state(None)
-    await state.update_data(city_name_period=None)
-    await message.answer(weather_info, parse_mode=ParseMode.HTML)
-    await message.answer(
-        _("Выберите период прогноза"),
-        reply_markup=keyboard.get_keyboard(
-            _("Текущий ⏺"),
-            _("На 3 дня ⏩"),
-            _("Назад на главную ↩️"),
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
-    )
+async def process_city_period(message: Message, state: FSMContext) -> None:
+    """Показывает трёхдневный прогноз по названию."""
+    await _process_city(message, state)
 
 
 @weather_router.message(City.city_name_period)
-async def process_city_period_(message: Message):
+async def process_city_period_(message: Message) -> None:
+    """Сообщает о неверном формате города."""
     await message.answer(
         _("Вы ввели не допустимые данные, введите название населенного пункта")
+    )
+
+
+async def _process_location(message: Message, state: FSMContext) -> None:
+    """Запрашивает прогноз по отправленной геолокации."""
+    await message.answer(_("Локация получена"))
+    await _show_forecast(
+        message,
+        state,
+        {
+            "lat": message.location.latitude,
+            "lon": message.location.longitude,
+        },
     )
 
 
 @weather_router.message(F.location, City.forecast_moment)
-async def loc_message_moment(message: Message, state: FSMContext):
-    await message.answer(_("Локация получена"))
-    await state.set_state(None)
-    await state.update_data(city_name_moment=None)
-    data_state = await state.get_data()
-    user_locale = data_state.get("locale")
-    weather_info = await parse_weather_data(
-        1,
-        city=None,
-        lat=message.location.latitude,
-        lon=message.location.longitude,
-        locale=user_locale,
-        api_key=getattr(message.bot, "api_weather", ""),
-        session=getattr(message.bot, "http_session", None),
-    )
-    await message.answer(weather_info, parse_mode=ParseMode.HTML)
-    await message.answer(
-        _("Выберите период прогноза"),
-        reply_markup=keyboard.get_keyboard(
-            _("Текущий ⏺"),
-            _("На 3 дня ⏩"),
-            _("Назад на главную ↩️"),
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
-    )
+async def loc_message_moment(message: Message, state: FSMContext) -> None:
+    """Завершает старый выбор геолокации прогнозом на три дня."""
+    await _process_location(message, state)
 
 
 @weather_router.message(F.location, City.forecast_period)
-async def loc_message_period(message: Message, state: FSMContext):
-    await message.answer(_("Локация получена"))
-    await state.set_state(None)
-    await state.update_data(city_name_period=None)
-    data_state = await state.get_data()
-    user_locale = data_state.get("locale")
-    weather_info = await parse_weather_data(
-        2,
-        city=None,
-        lat=message.location.latitude,
-        lon=message.location.longitude,
-        locale=user_locale,
-        api_key=getattr(message.bot, "api_weather", ""),
-        session=getattr(message.bot, "http_session", None),
-    )
-    await message.answer(weather_info, parse_mode=ParseMode.HTML)
-    await message.answer(
-        _("Выберите период прогноза"),
-        reply_markup=keyboard.get_keyboard(
-            _("Текущий ⏺"),
-            _("На 3 дня ⏩"),
-            _("Назад на главную ↩️"),
-            sizes=(
-                2,
-                1,
-            ),
-            placeholder="⬇️",
-        ),
-    )
+async def loc_message_period(message: Message, state: FSMContext) -> None:
+    """Показывает трёхдневный прогноз по геолокации."""
+    await _process_location(message, state)

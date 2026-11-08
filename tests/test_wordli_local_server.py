@@ -154,6 +154,9 @@ def test_expired_request_returns_new_day_without_a_loss(
         "/data/archive/ru5-opencorpora-wordfreq-v1-165050f1e2b8.json",
         "/README.md",
         "/data/",
+        "/assets/",
+        "/assets/../engine.py",
+        "/testing/generate_wordli_formula.py",
     ],
 )
 def test_private_files_are_not_served(
@@ -174,6 +177,20 @@ def test_html_and_head_are_available(local_server: LocalWordliServer) -> None:
     assert status == 200
     assert int(headers["Content-Length"]) > 0
     assert raw == b""
+
+
+@pytest.mark.parametrize("name", ["score-formula", "quality-formula"])
+def test_formula_images_are_available(
+    local_server: LocalWordliServer, name: str
+) -> None:
+    """Отдаёт только готовые изображения формул с правильным типом."""
+    status, headers, raw = request(
+        local_server, "GET", f"/assets/{name}.png"
+    )
+    assert status == 200
+    assert headers["Content-Type"] == "image/png"
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    assert raw.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 @pytest.mark.parametrize("origin", ["https://example.com", "null"])

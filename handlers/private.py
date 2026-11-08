@@ -6,10 +6,18 @@ import os
 import random as r
 from urllib.parse import urlsplit
 
+from aiohttp import ClientError
 from aiogram import F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, Message
+from aiogram.types import (
+    CallbackQuery,
+    FSInputFile,
+    InlineKeyboardButton,
+    Message,
+    ReactionTypeEmoji,
+)
 from aiogram.utils.i18n import gettext as _
 from aiogram.utils.i18n import lazy_gettext as __
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -84,7 +92,8 @@ async def author_cmd(callback: CallbackQuery, workflow_data: dict, state: FSMCon
         except Exception as e:
             logger.error("Ошибка при удалении сообщения: %s", e)
 
-    await callback.message.answer(text=" ... ", reply_markup=keyboard.del_kb)
+    # Нижние кнопки уже убраны при открытии информации: не вызываем удаление снова.
+    await callback.message.answer(text=" ... ")
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="Telegram", url="tg://user?id=459148628"))
     builder.row(
@@ -161,7 +170,8 @@ async def callback_about(callback: CallbackQuery, state: FSMContext):
 
 # кнопка "Котики"
 @private_router.message(F.text == CATS)
-async def cat_cmd(message: Message, workflow_data: dict):
+async def cat_cmd(message: Message, workflow_data: dict[str, object]) -> None:
+    """Отправляет котика и отмечает архивное фото сердечком."""
     # вероятность 20% для выбора локального изображения с Кет
     if r.random() < 0.2:
         image_folder = "common/image_cat"
@@ -174,7 +184,16 @@ async def cat_cmd(message: Message, workflow_data: dict):
         if images:
             random_image = r.choice(images)
             photo = FSInputFile(random_image)
-            await message.answer_photo(photo)
+            sent_photo = await message.answer_photo(photo)
+            try:
+                await sent_photo.react([ReactionTypeEmoji(emoji="❤")])
+            except (
+                TelegramAPIError,
+                ClientError,
+                TimeoutError,
+                asyncio.TimeoutError,
+            ):
+                logger.warning("Не удалось добавить реакцию к архивному фото")
             return
         else:
             await message.answer(_("Локальные изображения не найдены."))

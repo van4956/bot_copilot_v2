@@ -128,6 +128,7 @@ async def test_schema_is_isolated_from_unrelated_tables(bundle) -> None:
     assert set(wordli_metadata.tables) == {
         "wordli_profiles",
         "wordli_requests",
+        "wordli_settings",
     }
     async with database.connect() as connection:
         assert await connection.scalar(select(unrelated.c.value)) == 77

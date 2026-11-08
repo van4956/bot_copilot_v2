@@ -177,6 +177,9 @@ button:focus-visible {
 .tile[data-state="absent"] { background: var(--tile-absent); }
 
 .tile--active { border-color: #6b6b6b; }
+.tile--editable { cursor: text; }
+.tile--hint { color: #fedd2c88; }
+.tile--draft-correct { color: var(--yellow); }
 
 .tile--reveal {
   backface-visibility: hidden;
@@ -384,7 +387,9 @@ button:focus-visible {
 }
 
 .screen--settings,
-.screen--rules {
+.screen--rules,
+.screen--formula,
+.screen--leaderboard {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
@@ -424,6 +429,46 @@ button:focus-visible {
   background: var(--white);
   box-shadow: 0 1px 5px #00000026;
 }
+.reminder-switch:not(:disabled) { cursor: pointer; }
+.reminder-switch[aria-checked="true"] { background: var(--yellow); }
+.reminder-switch[aria-checked="true"] span { transform: translateX(25px); }
+.reminder-switch:disabled { opacity: 0.6; }
+.reminder-switch span { transition: transform 150ms ease; }
+
+.rules-content.formula-content {
+  display: grid;
+  gap: 24px;
+  padding: 24px 20px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+.rules-content.formula-content h2 { margin: 0; font-size: 24px; font-weight: 400; line-height: 1.3; }
+.formula-content h3 { margin: 0; font-size: 18px; font-weight: 400; line-height: 1.45; }
+.formula-content ul { margin: 11px 0 0; padding-left: 17px; }
+.formula-content li { padding-left: 1px; }
+.formula-content li + li { margin-top: 6px; }
+.formula-content b { font-weight: 500; }
+.formula-quality { display: inline-block; width: auto; height: 2.2em; vertical-align: middle; }
+.formula-content .formula-note { margin: 0; color: #b7b7b7; font-size: 15px; line-height: 1.45; }
+.score-formula { margin-top: 15px; min-width: 0; text-align: center; }
+.score-formula img { display: block; width: 100%; height: auto; max-width: 520px; margin: 0 auto; }
+
+.leaderboard-content { padding: 20px 15px; border-radius: 24px; background: var(--surface); }
+.leaderboard-status { margin: 0 0 15px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.leaderboard-status:empty { display: none; }
+.leaderboard-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+.leaderboard-table th { padding: 0 8px 14px; color: var(--muted); font-weight: 400; text-align: left; }
+.leaderboard-table th:nth-child(2), .leaderboard-table td:nth-child(2) { width: 62px; text-align: right; }
+.leaderboard-table th:nth-child(3), .leaderboard-table td:nth-child(3) { width: 66px; text-align: right; }
+.leaderboard-table td { padding: 14px 8px; border-top: 1px solid #ffffff0c; font-variant-numeric: tabular-nums; vertical-align: middle; }
+.leaderboard-name { display: flex; align-items: baseline; gap: 10px; }
+.leaderboard-name span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.leaderboard-rank { flex: 0 0 22px; color: var(--muted); font-size: 12px; }
+.leaderboard-self td { background: #ffffff09; }
+.leaderboard-self td:first-child { border-radius: 8px 0 0 8px; }
+.leaderboard-self td:last-child { border-radius: 0 8px 8px 0; }
+.leaderboard-self .leaderboard-name { font-weight: 500; }
+.leaderboard-separator td { height: 15px; padding: 0; border-top: 1px dashed #666666; }
 
 .next-word-countdown {
   display: block;
@@ -689,6 +734,16 @@ button:focus-visible {
   .progress-point { font-size: 20px; }
   .progress-word { font-size: 11px; }
   .summary-title { font-size: 27px; }
+  .rules-content.formula-content { padding: 23px 10px; font-size: 17px; }
+  .formula-content h3 { font-size: 17px; }
+  .formula-content .formula-note { font-size: 14px; }
+  .leaderboard-content { padding-right: 9px; padding-left: 9px; }
+  .leaderboard-table { font-size: 13px; }
+  .leaderboard-table td, .leaderboard-table th { padding-right: 5px; padding-left: 5px; }
+}
+
+@media (min-width: 351px) and (max-width: 405px) {
+  .rules-content.formula-content { padding-right: 16px; padding-left: 16px; }
 }
 
 @media (orientation: landscape) and (max-height: 480px) {

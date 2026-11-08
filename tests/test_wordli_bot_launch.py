@@ -154,7 +154,7 @@ async def test_test_words_launches_inline_webapp(
     assert button.web_app.url == TEST_URL
     assert button.callback_data is None
     dimensions = markup.inline_keyboard[0][1]
-    assert dimensions.text == "Битва Измерений"
+    assert dimensions.text == "4ПО5"
     assert dimensions.callback_data == "wordli_dimensions_stub"
     assert dimensions.web_app is None
     assert dimensions.url is None

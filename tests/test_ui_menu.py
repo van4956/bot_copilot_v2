@@ -9,12 +9,12 @@ import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.dispatcher.event.bases import UNHANDLED
 from aiogram.types import CallbackQuery, Message, Update
-from aiogram.utils.i18n import I18n
+from aiogram.utils.i18n import FSMI18nMiddleware, I18n
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import create_bot, create_dispatcher
 from common import keyboard
-from common.comands import admin_command, private_command
+from common.comands import get_commands
 from config_data.config import ROOT, Config, DataBase, Redis, TgBot
 from database.models import Base
 from handlers import miniapp, other
@@ -64,13 +64,11 @@ def _message(**fields) -> dict:
     }
 
 
-@pytest.mark.parametrize("commands", [private_command, admin_command])
-def test_menu_has_book_instead_of_mini(commands: list) -> None:
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_menu_has_book_instead_of_mini(language: str) -> None:
     """Оба меню содержат прежние команды и новый вход cookbook."""
-    assert [(item.command, item.description) for item in commands] == [
-        ("main", "main pannel"),
-        ("book", "cookbook"),
-        ("info", "settings"),
+    assert [item.command for item in get_commands(language)] == [
+        "main", "book", "info",
     ]
 
 
@@ -274,11 +272,16 @@ async def test_changing_language_does_not_restore_old_book_button(
         from_user=SimpleNamespace(id=USER_ID),
         message=SimpleNamespace(delete=AsyncMock(), answer=AsyncMock()),
         answer=AsyncMock(),
+        bot=None,
     )
     state = SimpleNamespace(update_data=AsyncMock())
     monkeypatch.setattr(other, "orm_update_locale", AsyncMock())
 
-    await other.update_locale_cmd(callback, object(), state, {})
+    i18n = I18n(path=str(ROOT / "locales"), domain="bot_00_template")
+    with i18n.context(), i18n.use_locale("en" if language == "ru" else "ru"):
+        await other.update_locale_cmd(
+            callback, object(), state, {}, FSMI18nMiddleware(i18n)
+        )
 
     markup = callback.message.answer.await_args.kwargs["reply_markup"]
     assert markup.keyboard[1][1].text == word

@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import secrets
 import unicodedata
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from weakref import WeakKeyDictionary, WeakValueDictionary
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import (
     JSON,
@@ -35,10 +37,10 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from .engine import (
-    DRAFT_PATTERN,
     MAX_GAMES_PER_DAY,
     GameError,
     LocalGameEngine,
+    normalize_draft,
 )
 
 wordli_metadata = MetaData()
@@ -64,6 +66,61 @@ requests_table = Table(
     Column("fingerprint", String(64), nullable=False),
     Column("response", JSON, nullable=False),
 )
+settings_table = Table(
+    "wordli_settings",
+    wordli_metadata,
+    Column(
+        "user_id",
+        BigInteger,
+        ForeignKey("wordli_profiles.user_id"),
+        primary_key=True,
+        autoincrement=False,
+    ),
+    Column("data", JSON, nullable=False),
+)
+DEFAULT_TIMEZONE = "Etc/GMT-4"
+MAX_REMINDER_ATTEMPTS = 3
+
+
+def validate_timezone(value: str) -> str:
+    """Принимает существующий часовой пояс IANA без произвольных путей."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 100
+        or value != value.strip()
+        or value.startswith(("/", "."))
+        or ".." in value.split("/")
+        or "\\" in value
+    ):
+        raise GameError("invalid_timezone", "Неизвестный часовой пояс.")
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise GameError("invalid_timezone", "Неизвестный часовой пояс.") from None
+    return value
+
+
+def _display_name(value: str) -> str:
+    """Ограничивает публичное имя без управляющих и невидимых символов."""
+    if not isinstance(value, str):
+        return "Игрок"
+    normalized = unicodedata.normalize("NFC", value)
+    visible = "".join(
+        letter
+        for letter in normalized
+        if unicodedata.category(letter) not in {"Cc", "Cf", "Cs"}
+    )
+    return " ".join(visible.split())[:128] or "Игрок"
+
+
+def _settings_public(data: dict[str, Any]) -> dict[str, Any]:
+    """Не выдаёт внутреннее расписание и Telegram ID клиента."""
+    return {
+        "timezone": data.get("timezone", DEFAULT_TIMEZONE),
+        "reminder_enabled": data.get("reminder_enabled") is True,
+    }
+
 
 # SQLite не имеет SELECT FOR UPDATE; блокировки общие для экземпляров в loop.
 _sqlite_locks: WeakKeyDictionary[
@@ -137,6 +194,8 @@ class WordliStorage:
         db_engine: AsyncEngine,
         game_engine: LocalGameEngine,
         clock: Callable[[], datetime] | None = None,
+        *,
+        random_seconds: Callable[[], int] | None = None,
     ) -> None:
         """Принимает проверенный снаружи движок БД; не открывает соединения."""
         if db_engine.dialect.name not in {"postgresql", "sqlite"}:
@@ -144,6 +203,7 @@ class WordliStorage:
         self._database = db_engine
         self._rules = game_engine
         self._clock = clock if clock is not None else _now
+        self._random_seconds = random_seconds or (lambda: secrets.randbelow(1201))
         self._sessions = async_sessionmaker(db_engine, expire_on_commit=False)
         self._dialect = db_engine.dialect.name
         database = db_engine.url.database
@@ -154,7 +214,7 @@ class WordliStorage:
         )
 
     async def init_schema(self) -> None:
-        """Создаёт только две таблицы из самостоятельной метадаты Wordli."""
+        """Создаёт только самостоятельные таблицы Wordli."""
         async with self._database.begin() as connection:
             await connection.run_sync(wordli_metadata.create_all)
 
@@ -302,11 +362,7 @@ class WordliStorage:
         draft: str,
     ) -> dict[str, Any]:
         """Сохраняет незавершённый ввод без расходования попытки."""
-        if not isinstance(draft, str) or len(draft) > 64:
-            raise GameError("invalid_draft", "Некорректная строка ввода.")
-        draft = unicodedata.normalize("NFC", draft).strip().upper().replace("Ё", "Е")
-        if not DRAFT_PATTERN.fullmatch(draft):
-            raise GameError("invalid_draft", "Некорректная строка ввода.")
+        draft = normalize_draft(draft)
         return await self._change(
             user_id,
             "draft",
@@ -422,3 +478,354 @@ class WordliStorage:
                 record["draft"] = details["draft"]
                 break
         return self._rules.bootstrap(state["history"], today=today, player_id=player_id)
+
+    async def _settings_row(self, session: AsyncSession, user_id: int) -> RowMapping:
+        """Блокирует настройки и создаёт безопасные значения по умолчанию."""
+        query = (
+            select(settings_table)
+            .where(settings_table.c.user_id == user_id)
+            .with_for_update()
+        )
+        row = (await session.execute(query)).mappings().one_or_none()
+        if row is None:
+            insert = pg_insert if self._dialect == "postgresql" else sqlite_insert
+            await session.execute(
+                insert(settings_table)
+                .values(
+                    user_id=user_id,
+                    data={
+                        "name": "Игрок",
+                        "timezone": DEFAULT_TIMEZONE,
+                        "reminder_enabled": False,
+                    },
+                )
+                .on_conflict_do_nothing(index_elements=[settings_table.c.user_id])
+            )
+            row = (await session.execute(query)).mappings().one()
+        return row
+
+    async def settings(
+        self,
+        user_id: int,
+        *,
+        display_name: str | None = None,
+        timezone_name: str | None = None,
+        reminder_enabled: bool | None = None,
+    ) -> dict[str, Any]:
+        """Читает предпочтения и обновляет только явно переданные значения."""
+        _check_user(user_id)
+        if timezone_name is not None:
+            timezone_name = validate_timezone(timezone_name)
+        if reminder_enabled is not None and type(reminder_enabled) is not bool:
+            raise GameError("invalid_settings", "Некорректная настройка напоминания.")
+        async with self._serialized(user_id):
+            async with self._sessions.begin() as session:
+                await self._profile(session, user_id)
+                row = await self._settings_row(session, user_id)
+                data = dict(row["data"])
+                if display_name is not None:
+                    data["name"] = _display_name(display_name)
+                if timezone_name is not None:
+                    data["timezone"] = timezone_name
+                if reminder_enabled is not None:
+                    data["reminder_enabled"] = reminder_enabled
+                if data != row["data"]:
+                    await session.execute(
+                        update(settings_table)
+                        .where(settings_table.c.user_id == user_id)
+                        .values(data=data)
+                    )
+                return _settings_public(data)
+
+    async def leaderboard(self, user_id: int) -> dict[str, Any]:
+        """Считает открытый рейтинг без выдачи личной истории и новых слов."""
+        _check_user(user_id)
+        async with self._sessions() as session:
+            profiles = (
+                (
+                    await session.execute(
+                        select(
+                            profiles_table.c.user_id,
+                            profiles_table.c.history,
+                            profiles_table.c.dictionary_id,
+                            settings_table.c.data,
+                        ).select_from(
+                            profiles_table.outerjoin(
+                                settings_table,
+                                settings_table.c.user_id == profiles_table.c.user_id,
+                            )
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        today = self._today()
+        participants = []
+        for profile in profiles:
+            try:
+                history = profile["history"]
+                if profile["dictionary_id"] != self._rules.dictionary_id:
+                    history = self._rules.migrate_history(
+                        history, profile["dictionary_id"], today
+                    )
+                stats = self._rules.statistics(history, today=today)
+            except GameError:
+                # Повреждённый профиль не меняем и не включаем в публичную доску.
+                continue
+            if stats["played"] < 10 or stats["score"] is None:
+                continue
+            data = profile["data"] if isinstance(profile["data"], dict) else {}
+            participants.append(
+                {
+                    "user_id": profile["user_id"],
+                    "name": _display_name(data.get("name", "Игрок")),
+                    "played": stats["played"],
+                    "score": stats["score"],
+                    "is_self": profile["user_id"] == user_id,
+                }
+            )
+        participants.sort(
+            key=lambda item: (-item["score"], -item["played"], item["user_id"])
+        )
+        rank = 0
+        previous = None
+        self_position = None
+        for position, participant in enumerate(participants):
+            pair = (participant["score"], participant["played"])
+            if pair != previous:
+                rank += 1
+                previous = pair
+            participant["rank"] = rank
+            if participant["is_self"]:
+                self_position = position
+        separator = None
+        selected = participants[:10]
+        if len(participants) > 10 and self_position is not None and self_position >= 10:
+            if len(participants) - self_position - 1 < 2:
+                start = self_position - 4
+            else:
+                start = self_position - 2
+            selected = participants[:5] + participants[start : start + 5]
+            separator = 5
+        return {
+            "rows": [
+                {key: value for key, value in row.items() if key != "user_id"}
+                for row in selected
+            ],
+            "separator_after": separator,
+            "total": len(participants),
+            "self_eligible": self_position is not None,
+        }
+
+    async def claim_due_reminders(
+        self,
+        now: datetime,
+        limit: int = 100,
+        *,
+        allowed_user_ids: set[int] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Закрепляет случайное расписание и однократно забирает готовые отправки."""
+        if not isinstance(now, datetime) or now.utcoffset() is None:
+            raise ValueError("Нужны часы с часовым поясом")
+        if type(limit) is not int or not 1 <= limit <= 1000:
+            raise ValueError("Лимит отправок должен быть от 1 до 1000")
+        if allowed_user_ids is not None:
+            for user_id in allowed_user_ids:
+                _check_user(user_id)
+            if not allowed_user_ids:
+                return []
+        now = now.astimezone(timezone.utc)
+        query = (
+            select(settings_table.c.user_id)
+            .where(settings_table.c.data["reminder_enabled"].as_boolean().is_(True))
+            .order_by(settings_table.c.user_id)
+        )
+        if allowed_user_ids is not None:
+            query = query.where(settings_table.c.user_id.in_(allowed_user_ids))
+        async with self._sessions() as session:
+            user_ids = (await session.scalars(query)).all()
+        deliveries = []
+        for user_id in user_ids:
+            if len(deliveries) >= limit:
+                break
+            async with self._serialized(user_id):
+                async with self._sessions.begin() as session:
+                    profile = (
+                        (
+                            await session.execute(
+                                select(profiles_table)
+                                .where(profiles_table.c.user_id == user_id)
+                                .with_for_update()
+                            )
+                        )
+                        .mappings()
+                        .one_or_none()
+                    )
+                    if profile is None:
+                        continue
+                    row = await self._settings_row(session, user_id)
+                    original = row["data"]
+                    data = dict(original)
+                    if data.get("reminder_enabled") is not True:
+                        continue
+                    try:
+                        zone_name = validate_timezone(
+                            data.get("timezone", DEFAULT_TIMEZONE)
+                        )
+                    except GameError:
+                        zone_name = DEFAULT_TIMEZONE
+                    local = now.astimezone(ZoneInfo(zone_name))
+                    day = local.date().isoformat()
+                    if (
+                        data.get("reminder_claimed_day") == day
+                        and data.get("reminder_status") != "retry"
+                    ):
+                        continue
+                    if (
+                        data.get("reminder_day") != day
+                        or data.get("reminder_timezone") != zone_name
+                    ):
+                        seconds = self._random_seconds()
+                        if type(seconds) is not int or not 0 <= seconds <= 1200:
+                            raise ValueError(
+                                "Случайное смещение должно быть от 0 до 1200"
+                            )
+                        due = datetime.combine(
+                            local.date(), time(5, 50), ZoneInfo(zone_name)
+                        )
+                        due += timedelta(seconds=seconds)
+                        data.update(
+                            {
+                                "reminder_day": day,
+                                "reminder_timezone": zone_name,
+                                "reminder_due_at": due.astimezone(
+                                    timezone.utc
+                                ).isoformat(),
+                                "reminder_status": "scheduled",
+                                "reminder_attempts": 0,
+                            }
+                        )
+                    end = datetime.combine(
+                        local.date(), time(6, 10), ZoneInfo(zone_name)
+                    )
+                    due = datetime.fromisoformat(data["reminder_due_at"])
+                    if local > end:
+                        data["reminder_status"] = "skipped"
+                    elif due <= now and data.get("reminder_status") in {
+                        "scheduled",
+                        "retry",
+                    }:
+                        try:
+                            if not isinstance(profile["history"], list):
+                                raise GameError(
+                                    "invalid_history", "Некорректная история."
+                                )
+                            daily = next(
+                                (
+                                    record
+                                    for record in profile["history"]
+                                    if isinstance(record, dict)
+                                    and record.get("day") == now.date().isoformat()
+                                    and record.get("index", 0) == 0
+                                ),
+                                None,
+                            )
+                            if daily is None:
+                                completed = False
+                            else:
+                                record = self._rules.migrate_history(
+                                    [daily], profile["dictionary_id"], now.date()
+                                )[0]
+                                completed = (
+                                    record["answer"] in record["guesses"]
+                                    or len(record["guesses"]) >= 6
+                                )
+                        except GameError:
+                            completed = True
+                        if completed:
+                            data["reminder_status"] = "skipped"
+                        else:
+                            token = str(uuid4())
+                            data.update(
+                                {
+                                    "reminder_status": "claimed",
+                                    "reminder_claimed_day": day,
+                                    "reminder_claim_token": token,
+                                    "reminder_attempts": data.get(
+                                        "reminder_attempts", 0
+                                    )
+                                    + 1,
+                                }
+                            )
+                            deliveries.append(
+                                {"user_id": user_id, "claim_token": token}
+                            )
+                    if data != original:
+                        await session.execute(
+                            update(settings_table)
+                            .where(settings_table.c.user_id == user_id)
+                            .values(data=data)
+                        )
+        return deliveries
+
+    async def finish_reminder(
+        self,
+        user_id: int,
+        claim_token: str,
+        outcome: str,
+        retry_at: datetime | None = None,
+    ) -> None:
+        """Подтверждает отправку или разрешает ограниченный явный повтор."""
+        _check_user(user_id)
+        if outcome not in {"sent", "blocked", "retry", "failed"}:
+            raise ValueError("Неизвестный исход отправки")
+        if retry_at is not None and (
+            not isinstance(retry_at, datetime) or retry_at.utcoffset() is None
+        ):
+            raise ValueError("Повтор требует времени с часовым поясом")
+        async with self._serialized(user_id):
+            async with self._sessions.begin() as session:
+                row = (
+                    (
+                        await session.execute(
+                            select(settings_table)
+                            .where(settings_table.c.user_id == user_id)
+                            .with_for_update()
+                        )
+                    )
+                    .mappings()
+                    .one_or_none()
+                )
+                if row is None:
+                    return
+                data = dict(row["data"])
+                if (
+                    data.get("reminder_claim_token") != claim_token
+                    or data.get("reminder_status") != "claimed"
+                ):
+                    return
+                if outcome == "blocked":
+                    data["reminder_enabled"] = False
+                if outcome == "retry":
+                    allowed = (
+                        retry_at is not None
+                        and data.get("reminder_attempts", 0) < MAX_REMINDER_ATTEMPTS
+                    )
+                    if allowed:
+                        local = retry_at.astimezone(ZoneInfo(data["reminder_timezone"]))
+                        allowed = local.date().isoformat() == data[
+                            "reminder_day"
+                        ] and time(5, 50) <= local.time() <= time(6, 10)
+                    if allowed:
+                        data["reminder_due_at"] = retry_at.astimezone(
+                            timezone.utc
+                        ).isoformat()
+                    else:
+                        outcome = "failed"
+                data["reminder_status"] = outcome
+                await session.execute(
+                    update(settings_table)
+                    .where(settings_table.c.user_id == user_id)
+                    .values(data=data)
+                )

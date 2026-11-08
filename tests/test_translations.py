@@ -6,6 +6,7 @@ from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
 from string import Formatter
+from types import SimpleNamespace
 
 import pytest
 from aiogram.utils.i18n import I18n
@@ -13,6 +14,8 @@ from babel.messages.extract import extract_from_file
 from babel.messages.pofile import read_po
 
 from common import keyboard
+from common.comands import get_commands
+from handlers import other
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = "bot_00_template"
@@ -239,6 +242,25 @@ def test_removed_amount_hint_is_only_obsolete(
     assert _translator(language).gettext(original) == original
 
 
+@pytest.mark.parametrize("language,previous_translation", [
+    ("ru", "Выберите период прогноза"),
+    ("en", "Choose the forecast period"),
+])
+def test_removed_weather_period_prompt_is_only_obsolete(
+    language: str, previous_translation: str
+) -> None:
+    """Удалённый выбор периода не попадает в активные переводы и шаблон."""
+    original = "Выберите период прогноза"
+    catalog = _catalog(language)
+    with (ROOT / "locales" / "messages.pot").open("rb") as stream:
+        template = read_po(stream)
+
+    assert catalog.get(original) is None
+    assert template.get(original) is None
+    assert catalog.obsolete[original].string == previous_translation
+    assert _translator(language).gettext(original) == original
+
+
 def test_compiled_catalog_formats_game_score() -> None:
     """Подстановка результата работает после загрузки MO."""
     message = "Игра окончена!\nВаш счет: {score}"
@@ -270,3 +292,96 @@ def test_actual_keyboard_uses_compiled_english_catalog() -> None:
     texts = [button.text for row in markup.keyboard for button in row]
 
     assert texts == ["Weather 🌊", "Currency 💵", "Cats 🐱", "Words 🧩"]
+
+
+@pytest.mark.parametrize("original,expected", [
+    ("Игры 🕹", "Games 🕹"),
+    ("◀️ Удалить", "◀️ Delete"),
+    ("Ввод ▶️", "Enter ▶️"),
+    ("Автор:", "Author:"),
+    ("Кулинарная книга", "Cookbook"),
+    ("Настройки", "Settings"),
+    ("Выбран: 🇺🇸 Английский", "Selected: 🇺🇸 English"),
+    ("Текущий язык \n\n 🇺🇸 Английский", "Current language \n\n 🇺🇸 English"),
+    ("Язык не поддерживается.", "This language is not supported."),
+])
+def test_shared_ui_labels_have_compiled_english(
+    original: str, expected: str,
+) -> None:
+    """Общие кнопки и подписи не возвращаются к русским строкам в EN."""
+    assert _translator("en").gettext(original) == expected
+
+
+@pytest.mark.parametrize("language,game,delete,enter", [
+    ("ru", "Игры 🕹", "◀️ Удалить", "Ввод ▶️"),
+    ("en", "Games 🕹", "◀️ Delete", "Enter ▶️"),
+])
+def test_shared_keyboards_use_current_catalog(
+    language: str, game: str, delete: str, enter: str,
+) -> None:
+    """Меню игр и цифровая клавиатура используют один контекст RU/EN."""
+    i18n = I18n(path=str(ROOT / "locales"), domain=DOMAIN)
+    bot = SimpleNamespace(
+        test_mode=False, wordli_enabled_verified=True,
+        wordli_webapp_url="https://example.invalid/game",
+    )
+    with i18n.context(), i18n.use_locale(language):
+        main = keyboard.start_keyboard(bot)
+        numbers = keyboard.markup_num()
+    assert main.keyboard[1][1].text == game
+    assert [button.text for button in numbers.inline_keyboard[4]] == [delete, enter]
+    assert [button.callback_data for button in numbers.inline_keyboard[4]] == [
+        "num_del", "num_enter",
+    ]
+
+
+@pytest.mark.parametrize("language,descriptions", [
+    ("ru", ["Главная панель", "Кулинарная книга", "Настройки"]),
+    ("en", ["Main panel", "Cookbook", "Settings"]),
+])
+def test_command_descriptions_use_explicit_locale(
+    language: str, descriptions: list[str],
+) -> None:
+    """Командное меню не зависит от языка соседнего запроса."""
+    i18n = I18n(path=str(ROOT / "locales"), domain=DOMAIN)
+    with i18n.context(), i18n.use_locale("ru" if language == "en" else "en"):
+        commands = get_commands(language)
+    assert [command.command for command in commands] == ["main", "book", "info"]
+    assert [command.description for command in commands] == descriptions
+
+
+@pytest.mark.parametrize("language,heading,memory,uptime", [
+    ("ru", "Состояние бота", "Память: 128.0 МБ", "Время работы:"),
+    ("en", "Bot status", "RAM: 128.0 MB", "Uptime:"),
+])
+async def test_status_uses_current_compiled_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    heading: str,
+    memory: str,
+    uptime: str,
+) -> None:
+    """Статус переводится целиком, а числовые значения не меняются."""
+    process = SimpleNamespace(
+        memory_info=lambda: SimpleNamespace(rss=128 * 1024 * 1024),
+        cpu_percent=lambda interval: 1.5,
+        create_time=lambda: 0,
+    )
+    monkeypatch.setattr(other.psutil, "Process", lambda: process)
+    i18n = I18n(path=str(ROOT / "locales"), domain=DOMAIN)
+    with i18n.context(), i18n.use_locale(language):
+        text = await other._status_text()
+    assert heading in text
+    assert memory in text
+    assert "CPU: 1.5%" in text
+    assert uptime in text
+    assert "Status of Bot" not in text
+
+
+def test_english_catalog_has_no_untranslated_russian_ui() -> None:
+    """Русские буквы допустимы только в неизменяемых именах игры и модели."""
+    for message in _catalog("en"):
+        if not message.id or not isinstance(message.string, str):
+            continue
+        text = message.string.replace("4ПО5", "").replace("Т-4", "")
+        assert not re.search("[А-Яа-яЁё]", text), message.id

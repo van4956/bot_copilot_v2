@@ -20,6 +20,7 @@ from handlers import currency
 def translations(monkeypatch: pytest.MonkeyPatch) -> None:
     """Изолирует проверку ввода от контекста переводов."""
     monkeypatch.setattr(currency, "_", lambda text: text)
+    monkeypatch.setattr(currency.keyboard, "_", lambda text: text)
     monkeypatch.setattr(currency, "_next_keyboard", lambda: None)
 
 
