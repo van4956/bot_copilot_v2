@@ -159,6 +159,7 @@ def create_production_app(config: ProductionConfig) -> web.Application:
                 async with reminder_service(
                     storage,
                     config.bot_token,
+                    public_origin=config.public_origin,
                     allowed_user_ids=(
                         None if config.access == "all" else config.allowed_user_ids
                     ),

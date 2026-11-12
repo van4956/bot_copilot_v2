@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
-from aiogram.methods import AnswerCallbackQuery, SendMessage, SendPhoto
+from aiogram.methods import AnswerCallbackQuery, DeleteMessage, SendMessage, SendPhoto
 from aiogram.methods.base import TelegramMethod
 from aiogram.types import Message, Update
 from sqlalchemy.ext.asyncio import (
@@ -19,7 +19,7 @@ from app import create_bot, create_dispatcher
 from config_data.config import Config, DataBase, Redis, TgBot
 from database.models import Base
 from database.orm_users import orm_add_user, orm_get_locale
-from handlers import other, private, start
+from handlers import donate, other, private, start
 from middlewares.throttle import ThrottleMiddleware
 
 Harness = tuple[
@@ -71,7 +71,12 @@ async def harness(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Harness]:
         dispatcher = create_dispatcher(
             config,
             sessions,
-            routers=[start.start_router, private.private_router, other.other_router],
+            routers=[
+                start.start_router,
+                private.private_router,
+                donate.donate_router,
+                other.other_router,
+            ],
         )
         for middleware in dispatcher.update.outer_middleware:
             if isinstance(middleware, ThrottleMiddleware):
@@ -159,6 +164,76 @@ def _command(user_id: int, command: str, number: int, language: str = "ru") -> U
 def _game_button(request: SendMessage) -> str:
     """Извлекает последнюю кнопку общей главной панели."""
     return request.reply_markup.keyboard[1][1].text
+
+
+@pytest.mark.parametrize("locale", ["ru", "en"])
+async def test_support_from_info_deletes_only_clicked_card_in_selected_language(
+    harness: Harness,
+    locale: str,
+) -> None:
+    """Реальный диспетчер заменяет карточку info и сохраняет выбранный язык."""
+    dispatcher, bot, sessions, requests = harness
+    user_id = 303
+    await _register(sessions, user_id, locale)
+    # Язык Telegram специально противоположен сохранённому выбору пользователя.
+    telegram_language = "en" if locale == "ru" else "ru"
+    await dispatcher.feed_update(
+        bot,
+        _command(user_id, "/info", 700, language=telegram_language),
+    )
+    state = dispatcher.fsm.get_context(bot=bot, chat_id=user_id, user_id=user_id)
+    clicked_id = (await state.get_data())["last_message_id"]
+    await state.update_data(last_message_id=9999)
+    callback = Update.model_validate(
+        {
+            "update_id": 701,
+            "callback_query": {
+                "id": "offline-support-transition",
+                "chat_instance": "offline",
+                "data": "donate",
+                "from": _actor(user_id, telegram_language),
+                "message": {
+                    "message_id": clicked_id,
+                    "date": datetime.now(timezone.utc),
+                    "chat": {"id": user_id, "type": "private"},
+                    "from": {"id": 123456, "is_bot": True, "first_name": "Bot"},
+                    "text": "Info panel",
+                },
+            },
+        }
+    )
+    previous = len(requests)
+    await dispatcher.feed_update(bot, callback)
+    transition = requests[previous:]
+    deleted = [call for call in transition if isinstance(call, DeleteMessage)]
+    assert len(deleted) == 1
+    assert deleted[0].message_id == clicked_id and deleted[0].chat_id == user_id
+    messages = [call for call in transition if isinstance(call, SendMessage)]
+    assert len(messages) == 1
+    assert messages[0].text == (
+        "Поддержать автора донатом"
+        if locale == "ru"
+        else "Support the author with a donation"
+    )
+    buttons = [
+        button.text
+        for row in messages[0].reply_markup.inline_keyboard
+        for button in row
+    ]
+    assert buttons == [
+        "10 ⭐️",
+        "50 ⭐️",
+        "100 ⭐️",
+        "другое" if locale == "ru" else "other",
+        "Назад на главную ↩️" if locale == "ru" else "Back to main ↩️",
+    ]
+    assert (
+        len([call for call in transition if isinstance(call, AnswerCallbackQuery)]) == 1
+    )
+    assert await state.get_state() == donate.Donate.donate_input.state
+    assert (await state.get_data())["locale"] == locale
+    async with sessions() as session:
+        assert await orm_get_locale(session, user_id) == locale
 
 
 @pytest.mark.parametrize("mode", ["test", "verified_production", "disabled"])

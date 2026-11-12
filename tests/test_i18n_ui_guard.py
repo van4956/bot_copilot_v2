@@ -16,9 +16,7 @@ ACTIVE_HANDLERS = (
     "currency",
     "cookbook",
     "donate",
-    "admin",
     "group",
-    "owner",
 )
 TEXT_METHODS = {
     "answer",

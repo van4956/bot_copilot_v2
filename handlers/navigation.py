@@ -15,12 +15,14 @@ from aiogram.types import (
     WebAppInfo,
 )
 from aiogram.utils.i18n import gettext as _
+from aiogram.utils.i18n import get_i18n
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
 from config_data.config import ROOT
 from filters.chat_type import ChatTypeFilter
 from handlers import cookbook, other, private
+from prototypes.wordli.bot_texts import with_game_language_notice
 
 # from handlers import miniapp
 
@@ -100,10 +102,6 @@ async def open_words(
                     InlineKeyboardButton(
                         text="5БУКВ", web_app=WebAppInfo(url=url)
                     ),
-                    InlineKeyboardButton(
-                        text=_("4ПО5"),
-                        callback_data="wordli_dimensions_stub",
-                    ),
                 ],
                 [
                     InlineKeyboardButton(
@@ -117,7 +115,10 @@ async def open_words(
             "🕹", parse_mode=None,
             reply_markup=ReplyKeyboardRemove(remove_keyboard=True),
         )
-        await message.answer(_("В какую игру сыграем?"), reply_markup=markup)
+        invitation = with_game_language_notice(
+            _("В какую игру сыграем?"), get_i18n().current_locale, _,
+        )
+        await message.answer(invitation, reply_markup=markup)
         return
     await message.answer(
         _("Данная функция в разработке"),

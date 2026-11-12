@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import Cookbook
+from database.models import Cookbook, CookbookEnglish
 
 
 def _recipe_values(data: dict[str, Any]) -> dict[str, Any]:
@@ -57,8 +57,15 @@ async def orm_update_recipe(
 
 async def orm_delete_recipe(session: AsyncSession, recipe_id: int) -> bool:
     """Удаляет рецепт, сохраняя идентификаторы остальных рецептов."""
-    result = await session.execute(
-        delete(Cookbook).where(Cookbook.recipe_id == recipe_id)
-    )
-    await session.commit()
+    try:
+        result = await session.execute(
+            delete(Cookbook).where(Cookbook.recipe_id == recipe_id)
+        )
+        await session.execute(
+            delete(CookbookEnglish).where(CookbookEnglish.recipe_id == recipe_id)
+        )
+        await session.commit()
+    except BaseException:
+        await session.rollback()
+        raise
     return result.rowcount > 0

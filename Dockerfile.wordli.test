@@ -13,7 +13,8 @@ COPY tests/test_wordli_engine.py tests/test_wordli_storage.py \
     tests/test_wordli_telegram_auth.py tests/test_wordli_telegram_server.py \
     tests/test_wordli_production_server.py tests/test_wordli_production_schema.py \
     tests/test_wordli_postgres_integration.py tests/test_wordli_community.py \
-    tests/test_wordli_reminders.py tests/test_wordli_score_draft_v2.py /app/qa_tests/
+    tests/test_wordli_reminders.py tests/test_wordli_score_draft_v2.py \
+    tests/test_wordli_score_delta.py /app/qa_tests/
 
 ENV APP_ENV=test
 USER 10001:10001

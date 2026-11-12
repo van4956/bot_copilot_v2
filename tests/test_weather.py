@@ -114,6 +114,38 @@ def test_missing_or_invalid_direction_is_not_invented(degrees: object) -> None:
     assert weather._wind_direction(degrees) == "—"
 
 
+@pytest.mark.parametrize(
+    ("temperature", "expected"),
+    [
+        (9.4, "9"),
+        (9.45, "9"),
+        (9.49, "9"),
+        (9.5, "10"),
+        (9.9, "10"),
+        (2.5, "3"),
+        (-9.4, "-9"),
+        (-9.45, "-9"),
+        (-9.49, "-9"),
+        (-9.5, "-10"),
+        (-2.5, "-3"),
+        (0.0, "0"),
+        (-0.0, "0"),
+        (0.4, "0"),
+        (-0.4, "0"),
+        (0.49999999999999994, "0"),
+        (-0.49999999999999994, "0"),
+        (0.5, "1"),
+        (-0.5, "-1"),
+        ("9.5", "10"),
+    ],
+)
+def test_temperature_rounds_once_with_half_away_from_zero(
+    temperature: object, expected: str
+) -> None:
+    """Половины округляются от нуля без банковского и двойного округления."""
+    assert weather._rounded_temperature(temperature) == expected
+
+
 async def test_weather_entry_skips_period_and_clears_previous_city(
     state: FSMContext, message: SimpleNamespace
 ) -> None:
@@ -253,10 +285,10 @@ async def test_current_monospace_only_temperature_and_coordinates(
     result = await weather.parse_weather_data(1, "Город", None, None, api_key="key")
     assert result == (
         "&lt;Город &amp; море&gt;\n<code>0° 0°</code>\n\n"
-        "<code>9.2°C</code> | 7% | 12.2𝑣 | ↙️ ☀️\n\n"
+        "<code>9°C</code> | 7% | 12.2𝑣 | ↙️ ☀️\n\n"
         "08-11-2026  00:00"
     )
-    assert re.findall(r"<code>(.*?)</code>", result) == ["0° 0°", "9.2°C"]
+    assert re.findall(r"<code>(.*?)</code>", result) == ["0° 0°", "9°C"]
     assert "123456" not in result
 
 
@@ -281,7 +313,9 @@ async def test_forecast_aligns_only_temperature_across_all_three_days(
     monkeypatch.setattr(weather, "get_json", AsyncMock(return_value=_forecast(entries)))
     result = await weather.parse_weather_data(2, "Город", None, None, api_key="key")
     lines = re.findall(r"^\d\d:\d\d .*?$", result, re.MULTILINE)
-    temperature_cells = [f"{temperature:>6.1f}°" for _, _, temperature, _, _ in cases]
+    temperature_cells = [
+        f"{temperature:>4}°" for temperature in ("0", "-9", "9", "-100", "100", "-100")
+    ]
     assert re.findall(r"<code>(.*?)</code>", result) == ["0° 0°", *temperature_cells]
     assert len(lines) == len(cases)
     for line, case, temperature_cell in zip(lines, cases, temperature_cells):
@@ -297,11 +331,22 @@ async def test_forecast_aligns_only_temperature_across_all_three_days(
 
 
 @pytest.mark.parametrize(
-    "temperatures",
-    [[0.0, 1.2, 9.9], [9.2, 10.0], [-0.01, 0.0], [-1.2, 1.2], [-100.0, 9.0]],
+    ("temperatures", "formatted"),
+    [
+        ([0.0, 1.2, 9.9], ["0", "1", "10"]),
+        ([9.2, 10.0], ["9", "10"]),
+        ([-0.01, 0.0], ["0", "0"]),
+        ([-1.2, 1.2], ["-1", "1"]),
+        ([-100.0, 9.0], ["-100", "9"]),
+        ([9.49, 9.5], ["9", "10"]),
+        ([-9.5, 9.5], ["-10", "10"]),
+        ([-0.4, 0.4], ["0", "0"]),
+    ],
 )
 async def test_temperature_width_is_actual_max_without_minimum_five(
-    monkeypatch: pytest.MonkeyPatch, temperatures: list[float]
+    monkeypatch: pytest.MonkeyPatch,
+    temperatures: list[float],
+    formatted: list[str],
 ) -> None:
     """Пробелы добавляются только слева до длины самой длинной температуры."""
     entries = []
@@ -312,7 +357,6 @@ async def test_temperature_width_is_actual_max_without_minimum_five(
     monkeypatch.setattr(weather, "get_json", AsyncMock(return_value=_forecast(entries)))
     result = await weather.parse_weather_data(2, "Город", None, None, api_key="key")
     cells = re.findall(r"<code>(.*?)</code>", result)[1:]
-    formatted = [f"{temperature:.1f}" for temperature in temperatures]
     width = max(map(len, formatted))
     assert cells == [f"{temperature:>{width}}°" for temperature in formatted]
     assert all(len(cell) == width + 1 for cell in cells)
@@ -335,7 +379,9 @@ async def test_forecast_keeps_three_local_calendar_days(
     assert result.count("01:00") == 3
 
 
-@pytest.mark.parametrize("temperature", [float("nan"), float("inf"), "<script>"])
+@pytest.mark.parametrize(
+    "temperature", [float("nan"), float("inf"), -float("inf"), "<script>", None, True]
+)
 async def test_invalid_numeric_payload_returns_safe_error(
     monkeypatch: pytest.MonkeyPatch, temperature: object
 ) -> None:

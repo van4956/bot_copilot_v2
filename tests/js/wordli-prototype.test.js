@@ -6,10 +6,29 @@ const path = require('node:path');
 const ui = require('../../prototypes/wordli/prototype.js');
 const DAY = '2026-11-05';
 
-test('цепочка показывает заглавные слова и пять звёздочек вместо будущих', () => {
+test('цепочка показывает заглавные слова, будущие не превращаются в текстовые звёздочки', () => {
     assert.equal(ui.formatProgressWord('кросс'), 'КРОСС');
     assert.equal(ui.formatProgressWord('ЗАПАЛ'), 'ЗАПАЛ');
-    assert.equal(ui.formatProgressWord(null), '*****');
+    assert.equal(ui.formatProgressWord(null), '');
+});
+
+test('будущее слово состоит из пяти отдельных кружков, отгаданное остаётся текстом', () => {
+    const doc = {createElement: tag => ({
+        tagName: tag, children: [], attributes: {}, textContent: '',
+        appendChild(child) {this.children.push(child);},
+        setAttribute(name, value) {this.attributes[name] = value;},
+    })};
+    const hidden = ui.createProgressWord(doc, null);
+    assert.equal(hidden.className, 'progress-word progress-word--pending');
+    assert.equal(hidden.attributes['aria-hidden'], 'true');
+    assert.equal(hidden.textContent, '');
+    assert.equal(hidden.children.length, 5);
+    assert(hidden.children.every(circle => circle.tagName === 'span'
+        && circle.className === 'progress-placeholder' && circle.textContent === ''));
+    const solved = ui.createProgressWord(doc, 'кросс');
+    assert.equal(solved.className, 'progress-word');
+    assert.equal(solved.textContent, 'КРОСС');
+    assert.equal(solved.children.length, 0);
 });
 
 function stateFor({guesses = [], draft = '', outcome = null, day = DAY, index = 0, history} = {}) {
@@ -113,6 +132,37 @@ test('ответ сервера проверяется до отрисовки',
     const bad = stateFor({guesses: ['ПАРОМ']});
     bad.game.rows[0].states[0] = '<script>';
     assert.throws(() => ui.validateState(bad), /состояние игры/);
+});
+
+test('дельта принимает целые значения и сохраняет совместимость старого ответа', () => {
+    const original = stateFor();
+    original.stats = {...original.stats, played: 6, score: 787};
+    for (const score_delta of [undefined, null, 0, 15, -7, 10000, -10000]) {
+        const candidate = {...original, stats: {...original.stats, score_delta}};
+        assert.equal(ui.validateState(candidate), candidate);
+    }
+    for (const score_delta of ['15', true, [], {}, 0.5, NaN, Infinity, 10001, -10001]) {
+        assert.throws(() => ui.validateState({...original, stats: {...original.stats, score_delta}}));
+    }
+    assert.throws(() => ui.validateState({...original, stats: {...original.stats, score: null, score_delta: 15}}));
+    assert.equal(ui.validateState(stateFor()).stats.score_delta, undefined);
+});
+
+test('дельта форматируется со знаком, нулевая и первое начисление скрываются', () => {
+    const stats = {played: 6, score: 787};
+    assert.equal(ui.formatScoreDelta({...stats, score_delta: 15}), '+15');
+    assert.equal(ui.formatScoreDelta({...stats, score_delta: -7}), '−7');
+    assert.equal(ui.formatScoreDelta({...stats, score_delta: 117}), '+117');
+    for (const score_delta of [undefined, null, 0, -0, '15', true, 1.5, NaN, Infinity, 10001]) {
+        assert.equal(ui.formatScoreDelta({...stats, score_delta}), '');
+    }
+    for (const played of [0, 4, 5]) {
+        assert.equal(ui.formatScoreDelta({...stats, played, score_delta: 117}), '');
+    }
+    assert.equal(ui.formatScoreDelta({...stats, score: null, score_delta: 117}), '');
+    assert.equal(ui.formatScoreDelta({...stats, score: undefined, score_delta: 117}), '');
+    assert.equal(ui.formatScoreDelta({...stats, score_delta: 15}), '+15');
+    assert.equal(ui.formatScoreDelta(stats), '');
 });
 
 test('API получает только разрешённый относительный адрес и JSON истории', async () => {

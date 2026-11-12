@@ -2,7 +2,9 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Text, func
+from sqlalchemy import (
+    BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -45,6 +47,22 @@ class Cookbook(Base):
     description: Mapped[str] = mapped_column(Text)
     price: Mapped[float] = mapped_column(Float(asdecimal=True), nullable=False)
     image: Mapped[str] = mapped_column(String(150))
+
+
+class CookbookEnglish(Base):
+    """Английские тексты рецепта с версией русского оригинала."""
+
+    __tablename__ = "cookbook_en"
+
+    recipe_id: Mapped[int] = mapped_column(
+        ForeignKey("cookbook.recipe_id", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    recipe_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
 # class Games соответствует таблице games в базе данных

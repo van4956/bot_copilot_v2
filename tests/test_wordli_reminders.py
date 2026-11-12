@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,17 +15,29 @@ from zoneinfo import ZoneInfo
 import aiohttp
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
+from aiohttp import web
+from sqlalchemy import BigInteger, Column, MetaData, String, Table, select, update
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from prototypes.wordli import production_server, reminders
+from prototypes.wordli import production_server, reminders, telegram_server
 from prototypes.wordli.production_server import (
     ProductionConfig,
     create_production_app,
     load_production_config,
 )
 from prototypes.wordli.engine import LocalGameEngine
-from prototypes.wordli.storage import WordliStorage, profiles_table, settings_table
+from prototypes.wordli.storage import (
+    WordliStorage,
+    profiles_table,
+    settings_table,
+    wordli_metadata,
+)
+from prototypes.wordli.bot_texts import (
+    GAME_LANGUAGE_NOTICE,
+    normalize_game_locale,
+    with_game_language_notice,
+)
 from prototypes.wordli.reminders import (
     REMINDER_TEXT,
     ReminderResult,
@@ -36,6 +49,7 @@ from prototypes.wordli.reminders import (
 NOW = datetime(2026, 11, 8, 2, 0, tzinfo=timezone.utc)
 TOKEN = "123456:SYNTHETIC_REMINDER_TOKEN"
 USER_ID = 900001
+ORIGIN = "https://wordli-reminders.example"
 
 
 class Response:
@@ -63,6 +77,7 @@ class Response:
 def storage() -> SimpleNamespace:
     """Создаёт очередь с одной заявкой на добровольное напоминание."""
     return SimpleNamespace(
+        user_locale=AsyncMock(return_value="ru"),
         claim_due_reminders=AsyncMock(
             side_effect=[
                 [{"user_id": USER_ID, "claim_token": "claim-one"}],
@@ -91,18 +106,32 @@ def storage() -> SimpleNamespace:
         (200, ValueError("bad json"), ReminderResult("failed")),
     ],
 )
-async def test_sender_only_sends_plain_text(
+async def test_sender_sends_plain_text_and_two_inline_buttons(
     status: int,
     body: object,
     expected: ReminderResult,
 ) -> None:
     """Ответы API не превращаются в бесконечные повторы и HTML-сообщения."""
     session = SimpleNamespace(post=Mock(return_value=Response(status, body)))
-    sender = TelegramReminderSender(session, TOKEN)
+    sender = TelegramReminderSender(session, TOKEN, ORIGIN)
     assert await sender.send(USER_ID) == expected
     session.post.assert_called_once_with(
         f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-        json={"chat_id": USER_ID, "text": REMINDER_TEXT},
+        json={
+            "chat_id": USER_ID,
+            "text": REMINDER_TEXT,
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{"text": "5БУКВ", "web_app": {"url": ORIGIN}}],
+                    [
+                        {
+                            "text": "Назад на главную ↩️",
+                            "callback_data": "wordli_back_to_main",
+                        }
+                    ],
+                ]
+            },
+        },
         allow_redirects=False,
     )
 
@@ -111,10 +140,52 @@ async def test_sender_only_sends_plain_text(
 async def test_uncertain_network_delivery_is_not_retried(error: Exception) -> None:
     """Потеря ответа не означает, что Telegram не доставил сообщение."""
     session = SimpleNamespace(post=Mock(side_effect=error))
-    assert await TelegramReminderSender(session, TOKEN).send(USER_ID) == (
+    assert await TelegramReminderSender(session, TOKEN, ORIGIN).send(USER_ID) == (
         ReminderResult("failed")
     )
     assert session.post.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "",
+        "http://wordli-reminders.example",
+        "https://user:synthetic@wordli-reminders.example",
+        "https://wordli-reminders.example/?token=synthetic",
+        "https://wordli-reminders.example/#fragment",
+    ],
+)
+def test_reminder_rejects_unsafe_game_link_before_sending(origin: str) -> None:
+    """Не отправляет кнопку с пустым адресом, секретами или HTTP."""
+    session = SimpleNamespace(post=Mock())
+    with pytest.raises(ValueError):
+        TelegramReminderSender(session, TOKEN, origin)
+    session.post.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        ORIGIN,
+        "https://other-wordli.example",
+        "https://synthetic-test.trycloudflare.com",
+    ],
+)
+async def test_reminder_button_uses_only_configured_game_url(origin: str) -> None:
+    """Тестовый и рабочий адрес передаются явно, без подстановки production."""
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    assert await TelegramReminderSender(session, TOKEN, origin).send(USER_ID) == (
+        ReminderResult("sent")
+    )
+    payload = session.post.call_args.kwargs["json"]
+    rows = payload["reply_markup"]["inline_keyboard"]
+    assert [len(row) for row in rows] == [1, 1]
+    assert rows[0][0] == {"text": "5БУКВ", "web_app": {"url": origin}}
+    assert rows[1][0]["callback_data"] == "wordli_back_to_main"
+    assert "reply_keyboard" not in payload["reply_markup"]
+    assert "parse_mode" not in payload
+    assert "message_effect_id" not in payload
 
 
 async def test_worker_claims_one_user_immediately_before_each_send() -> None:
@@ -259,7 +330,7 @@ async def test_service_awaits_worker_before_closing_http_session(monkeypatch) ->
     factory = Mock(return_value=Session())
     monkeypatch.setattr(reminders.aiohttp, "ClientSession", factory)
     monkeypatch.setattr(ReminderWorker, "run", run)
-    async with reminder_service(storage(), TOKEN):
+    async with reminder_service(storage(), TOKEN, public_origin=ORIGIN):
         await started.wait()
         events.append("application-ready")
     assert events == [
@@ -272,6 +343,66 @@ async def test_service_awaits_worker_before_closing_http_session(monkeypatch) ->
     timeout = factory.call_args.kwargs["timeout"]
     assert timeout.total == 10
     assert timeout.connect == 5
+
+
+def test_test_server_passes_its_origin_to_reminder_buttons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Локальный сервер не подставляет рабочий адрес в тестовые напоминания."""
+    database = SimpleNamespace(dispose=AsyncMock())
+    backend = SimpleNamespace(init_schema=AsyncMock())
+    test_origin = "https://local-wordli.example"
+    config = SimpleNamespace(
+        test_mode=True,
+        database_url="sqlite+aiosqlite:///:memory:",
+        tg_bot=SimpleNamespace(
+            token_test=TOKEN,
+            owner=[USER_ID],
+            admin_list=[USER_ID + 1],
+        ),
+        expected_test_bot_id=123456,
+    )
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("WORDLI_REMINDERS_ENABLED", "true")
+    monkeypatch.setattr(telegram_server, "load_config", Mock(return_value=config))
+    monkeypatch.setattr(telegram_server, "dotenv_values", Mock(return_value={}))
+    monkeypatch.setattr(
+        telegram_server, "create_async_engine", Mock(return_value=database)
+    )
+    monkeypatch.setattr(telegram_server, "WordliStorage", Mock(return_value=backend))
+    monkeypatch.setattr("sys.argv", ["telegram_server", "--public-origin", test_origin])
+    calls: list[tuple[str, str, set[int] | None]] = []
+
+    @asynccontextmanager
+    async def service(
+        store: WordliStorage,
+        token: str,
+        *,
+        public_origin: str,
+        allowed_user_ids: set[int] | None = None,
+    ) -> AsyncIterator[None]:
+        """Проверяет параметры без запуска задачи и HTTP-клиента."""
+        assert store is backend
+        calls.append((token, public_origin, allowed_user_ids))
+        yield
+
+    def run(application: web.Application, **kwargs: object) -> None:
+        """Вызывает только lifecycle без прослушивания порта."""
+
+        async def lifecycle() -> None:
+            """Открывает и закрывает подменённые ресурсы."""
+            application.freeze()
+            await application.startup()
+            await application.cleanup()
+
+        asyncio.run(lifecycle())
+
+    monkeypatch.setattr(telegram_server, "reminder_service", service)
+    monkeypatch.setattr(telegram_server.web, "run_app", run)
+    telegram_server.main()
+    assert calls == [(TOKEN, test_origin, {USER_ID, USER_ID + 1})]
+    backend.init_schema.assert_awaited_once_with()
+    database.dispose.assert_awaited_once_with()
 
 
 @pytest.mark.parametrize("enabled", [False, True])
@@ -293,10 +424,11 @@ async def test_production_cleanup_closes_worker_before_database(
     monkeypatch.setattr(production_server, "assert_runtime_permissions", AsyncMock())
 
     @asynccontextmanager
-    async def service(store, token, *, allowed_user_ids=None):
+    async def service(store, token, *, public_origin, allowed_user_ids=None):
         """Запоминает только безопасные этапы запуска и остановки."""
         assert store is backend
         assert token == TOKEN
+        assert public_origin == ORIGIN
         assert allowed_user_ids == frozenset({USER_ID})
         events.append("reminders-open")
         try:
@@ -685,3 +817,271 @@ async def test_restricted_claim_does_not_touch_other_subscribers(
     assert [item["user_id"] for item in result] == [USER_ID]
     assert await reminder_data(database, USER_ID + 1) == before
     assert await backend.claim_due_reminders(NOW, allowed_user_ids=set()) == []
+
+
+async def _locale_users(database, rows: list[dict]) -> Table:
+    """Создаёт только тестовые ID и языки без импорта моделей бота."""
+    users = Table(
+        "users",
+        MetaData(),
+        Column("user_id", BigInteger, primary_key=True),
+        Column("locale", String(150)),
+    )
+    async with database.begin() as connection:
+        await connection.run_sync(users.metadata.create_all)
+        if rows:
+            await connection.execute(users.insert(), rows)
+    return users
+
+
+@pytest.mark.parametrize("locale", ["ru", "RU", "ru-RU", "ru_RU"])
+def test_russian_invitation_and_reminder_have_no_language_notice(
+    locale: str,
+) -> None:
+    """Общий помощник сохраняет русский текст без вызова переводчика."""
+    translate = Mock(side_effect=AssertionError("Перевод не нужен"))
+    assert with_game_language_notice("Текст", locale, translate) == "Текст"
+    translate.assert_not_called()
+
+
+@pytest.mark.parametrize("locale", ["en", "en-US", "de", "fr"])
+def test_non_russian_notice_has_exact_parentheses_and_spacing(
+    locale: str,
+) -> None:
+    """Пометка отделена пустой строкой и не добавляет точку внутри скобок."""
+    translate = Mock(
+        return_value=(
+            "Due to the game's mechanics, it is currently available only in Russian"
+        )
+    )
+    assert with_game_language_notice("Translated text", locale, translate) == (
+        "Translated text\n\n(Due to the game's mechanics, "
+        "it is currently available only in Russian)"
+    )
+    translate.assert_called_once_with(GAME_LANGUAGE_NOTICE)
+
+
+@pytest.mark.parametrize("locale", ["en", "de", "fr-FR", "en_US"])
+async def test_sender_localizes_text_notice_and_back_without_aiogram(
+    locale: str,
+) -> None:
+    """Неизвестный каталог заменяет EN, а не русским интерфейсом."""
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    locale_reader = AsyncMock(return_value=locale)
+    sender = TelegramReminderSender(session, TOKEN, ORIGIN, locale_reader=locale_reader)
+    assert await sender.send(USER_ID) == ReminderResult("sent")
+    payload = session.post.call_args.kwargs["json"]
+    assert payload["text"] == (
+        "Time to play 5БУКВ! A new word is waiting for you today.\n\n"
+        "(Due to the game's mechanics, it is currently available only in Russian)"
+    )
+    rows = payload["reply_markup"]["inline_keyboard"]
+    assert rows[0][0] == {"text": "5БУКВ", "web_app": {"url": ORIGIN}}
+    assert rows[1][0] == {
+        "text": "Back to main ↩️",
+        "callback_data": "wordli_back_to_main",
+    }
+    locale_reader.assert_awaited_once_with(USER_ID)
+
+
+async def test_concurrent_russian_and_english_do_not_share_markup() -> None:
+    """Параллельные отправки не меняют чужой текст или подпись кнопки."""
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+
+    async def locale_reader(user_id: int) -> str:
+        """Возвращает разные локали после переключения задач."""
+        await asyncio.sleep(0)
+        return "ru" if user_id == USER_ID else "en"
+
+    sender = TelegramReminderSender(session, TOKEN, ORIGIN, locale_reader=locale_reader)
+    assert await asyncio.gather(sender.send(USER_ID), sender.send(USER_ID + 1)) == [
+        ReminderResult("sent"),
+        ReminderResult("sent"),
+    ]
+    messages = {
+        call.kwargs["json"]["chat_id"]: call.kwargs["json"]
+        for call in session.post.call_args_list
+    }
+    russian, english = messages[USER_ID], messages[USER_ID + 1]
+    assert russian["text"] == REMINDER_TEXT
+    assert "(Due to" in english["text"]
+    ru_keyboard = russian["reply_markup"]["inline_keyboard"]
+    en_keyboard = english["reply_markup"]["inline_keyboard"]
+    assert ru_keyboard[1][0]["text"] == "Назад на главную ↩️"
+    assert en_keyboard[1][0]["text"] == "Back to main ↩️"
+    assert ru_keyboard is not en_keyboard
+    ru_keyboard[1][0]["text"] = "Проверка"
+    assert en_keyboard[1][0]["text"] == "Back to main ↩️"
+
+
+@pytest.mark.parametrize("locale", ["../../etc", "en/ru", "en\\ru", "", None])
+async def test_sender_rejects_unsafe_injected_locale_before_catalog_lookup(
+    locale: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Произвольный поставщик языка не передаёт пути в поиск каталога."""
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    original = reminders.gettext.translation
+    translation = Mock(side_effect=original)
+    monkeypatch.setattr(reminders.gettext, "translation", translation)
+    sender = TelegramReminderSender(
+        session,
+        TOKEN,
+        ORIGIN,
+        locale_reader=AsyncMock(return_value=locale),
+    )
+    assert await sender.send(USER_ID) == ReminderResult("sent")
+    assert translation.call_args.kwargs["languages"] == ["ru"]
+    assert session.post.call_args.kwargs["json"]["text"] == REMINDER_TEXT
+
+
+async def test_sender_preserves_future_catalog_language_before_english_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Будущий немецкий каталог имеет приоритет перед английским резервом."""
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    original = reminders.gettext.translation
+    translation = Mock(side_effect=original)
+    monkeypatch.setattr(reminders.gettext, "translation", translation)
+    sender = TelegramReminderSender(
+        session,
+        TOKEN,
+        ORIGIN,
+        locale_reader=AsyncMock(return_value="de-DE"),
+    )
+    assert await sender.send(USER_ID) == ReminderResult("sent")
+    assert translation.call_args.kwargs["languages"] == ["de_de", "de", "en"]
+    assert session.post.call_args.kwargs["json"]["text"].startswith("Time to play")
+
+
+@pytest.mark.parametrize("value", ["../ru", "en/ru", "en\\ru", "", "en " * 30])
+def test_locale_normalization_rejects_paths_and_invalid_values(value: str) -> None:
+    """Единая нормализация не допускает локали-пути в gettext."""
+    with pytest.raises(ValueError):
+        normalize_game_locale(value)
+
+
+@pytest.mark.parametrize(
+    "locale,expected",
+    [
+        ("ru", "ru"),
+        ("RU", "ru"),
+        ("ru_RU", "ru"),
+        ("ru-RU", "ru"),
+        ("en", "en"),
+        ("en_US", "en-us"),
+        ("de", "de"),
+        ("fr-FR", "fr-fr"),
+        ("../en", "ru"),
+        ("en/ru", "ru"),
+        ("", "ru"),
+        (None, "ru"),
+    ],
+)
+async def test_storage_reads_only_database_locale(
+    reminder_backend,
+    locale: str | None,
+    expected: str,
+) -> None:
+    """Сохранённый язык не заменяется FSM, Telegram или настройками игры."""
+    backend, database, _, _ = reminder_backend
+    await _locale_users(database, [{"user_id": USER_ID, "locale": locale}])
+    assert await backend.user_locale(USER_ID) == expected
+    assert await backend.user_locale(USER_ID + 1) == "ru"
+    async with database.connect() as connection:
+        assert await connection.scalar(select(profiles_table.c.user_id)) is None
+        assert await connection.scalar(select(settings_table.c.user_id)) is None
+    assert "users" not in wordli_metadata.tables
+
+
+async def test_storage_missing_users_table_falls_back_with_safe_warning(
+    reminder_backend,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Самостоятельная игра не создаёт таблицу бота и не падает без неё."""
+    backend, _, _, _ = reminder_backend
+    assert await backend.user_locale(USER_ID) == "ru"
+    assert "недоступны" in caplog.text
+    assert TOKEN not in caplog.text
+    assert "select users" not in caplog.text.lower()
+
+
+@pytest.mark.parametrize(
+    "code,fallback",
+    [
+        ("42501", True),
+        ("42P01", True),
+        ("08006", False),
+        ("42703", False),
+    ],
+)
+async def test_storage_locale_masks_only_missing_table_or_permission(
+    reminder_backend,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    code: str,
+    fallback: bool,
+) -> None:
+    """Сбой соединения или схемы не выдаётся за обычный русский язык."""
+    backend, _, _, _ = reminder_backend
+    original = Exception(f"private-database-detail-{TOKEN}")
+    original.sqlstate = code
+    error = DBAPIError("private-query", {}, original)
+
+    @asynccontextmanager
+    async def failed_session():
+        """Подменяет только запрос языка без настоящей PostgreSQL."""
+        yield SimpleNamespace(scalar=AsyncMock(side_effect=error))
+
+    monkeypatch.setattr(backend, "_sessions", failed_session)
+    if fallback:
+        assert await backend.user_locale(USER_ID) == "ru"
+        assert "недоступны" in caplog.text
+    else:
+        with pytest.raises(DBAPIError):
+            await backend.user_locale(USER_ID)
+    assert TOKEN not in caplog.text
+    assert "private-query" not in caplog.text
+
+
+async def test_sender_reloads_locale_after_user_changes_database_language(
+    reminder_backend,
+) -> None:
+    """Каждое напоминание использует актуальную users.locale, не кэш FSM."""
+    backend, database, _, _ = reminder_backend
+    users = await _locale_users(database, [{"user_id": USER_ID, "locale": "ru"}])
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    sender = TelegramReminderSender(
+        session, TOKEN, ORIGIN, locale_reader=backend.user_locale
+    )
+    await sender.send(USER_ID)
+    russian = session.post.call_args.kwargs["json"]
+    async with database.begin() as connection:
+        await connection.execute(update(users).values(locale="en"))
+    await sender.send(USER_ID)
+    english = session.post.call_args.kwargs["json"]
+    assert russian["text"] == REMINDER_TEXT
+    assert english["text"].startswith("Time to play")
+
+
+async def test_locale_read_error_never_attempts_delivery_and_keeps_failure_semantics() -> (
+    None
+):
+    """Неопределённая ошибка чтения языка не отправляет сообщение не на том языке."""
+    session = SimpleNamespace(post=Mock())
+    sender = TelegramReminderSender(
+        session,
+        TOKEN,
+        ORIGIN,
+        locale_reader=AsyncMock(side_effect=RuntimeError("offline read failure")),
+    )
+    backend = storage()
+    worker = ReminderWorker(backend, sender.send, clock=lambda: NOW, sleep=AsyncMock())
+    assert await worker.run_once() == 1
+    session.post.assert_not_called()
+    backend.finish_reminder.assert_awaited_once_with(
+        USER_ID,
+        "claim-one",
+        "failed",
+        retry_at=None,
+    )

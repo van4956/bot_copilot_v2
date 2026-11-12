@@ -17,15 +17,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from common import keyboard
 from database.models import Base
 from database import orm_cookbook
-from handlers import admin, cookbook
+from handlers import admin, cookbook, private
 
 
 @pytest.fixture(autouse=True)
 def plain_translation(monkeypatch: pytest.MonkeyPatch) -> None:
     """Убирает зависимость модульных проверок от активного gettext-контекста."""
     monkeypatch.setattr(cookbook, "_", lambda text: text)
+    monkeypatch.setattr(cookbook, "get_i18n", lambda: SimpleNamespace(current_locale="ru"))
     monkeypatch.setattr(keyboard, "_", lambda text: text)
-    monkeypatch.setattr(admin, "_", lambda text: text)
+    monkeypatch.setattr(private, "_", lambda text: text)
 
 
 def _state(user_id: int = 1) -> FSMContext:
@@ -437,7 +438,7 @@ def test_book_reopens_last_existing_page(
 ) -> None:
     """Непустая книга не объявляется пустой из-за старой страницы."""
     monkeypatch.setattr(
-        cookbook, "orm_get_recipes",
+        cookbook, "orm_get_localized_recipes",
         AsyncMock(return_value=[_recipe(2), _recipe(3)]),
     )
 
@@ -460,7 +461,7 @@ def test_old_book_button_refreshes_deleted_recipe(
 ) -> None:
     """На границе книги устаревшая карточка заменяется существующей."""
     monkeypatch.setattr(
-        cookbook, "orm_get_recipes", AsyncMock(return_value=[_recipe(2)])
+        cookbook, "orm_get_localized_recipes", AsyncMock(return_value=[_recipe(2)])
     )
 
     async def scenario() -> None:
@@ -482,7 +483,7 @@ def test_failed_page_render_preserves_last_displayed_page(
 ) -> None:
     """Сбой Telegram не продвигает страницу, которую пользователь не увидел."""
     monkeypatch.setattr(
-        cookbook, "orm_get_recipes",
+        cookbook, "orm_get_localized_recipes",
         AsyncMock(return_value=[_recipe(1), _recipe(2)]),
     )
 

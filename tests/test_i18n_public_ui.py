@@ -195,16 +195,22 @@ async def test_games_invitation_and_stub_are_translated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Название игры сохраняется, а приглашение и уведомление переводятся."""
-    _, i18n, bot, state = ui
+    language, i18n, bot, state = ui
     message = _message(bot)
     await navigation.open_words(message, state, bot)
     call = message.answer.await_args
-    assert call.args[0] == i18n.gettext("В какую игру сыграем?")
+    expected = i18n.gettext("В какую игру сыграем?")
+    if language != "ru":
+        expected += (
+            "\n\n(Due to the game's mechanics, "
+            "it is currently available only in Russian)"
+        )
+    assert call.args[0] == expected
     assert _flat(call.kwargs["reply_markup"]) == [
         "5БУКВ",
-        "4ПО5",
         i18n.gettext("Назад на главную ↩️"),
     ]
+    assert [len(row) for row in call.kwargs["reply_markup"].inline_keyboard] == [1, 1]
     real_message = Message.model_validate(
         {
             "message_id": 55,
@@ -330,27 +336,14 @@ async def test_technical_identifiers_have_translated_labels(ui: Ui) -> None:
     )
 
 
-def test_admin_uses_repository_catalog_not_import_time_translation(ui: Ui) -> None:
-    """Админская клавиатура и подсказки используют настоящие собранные MO."""
-    language, _, _, _ = ui
+def test_admin_stays_russian_under_each_public_locale(ui: Ui) -> None:
+    """Публичная локаль не переводит административную клавиатуру и подсказки."""
     labels = _flat(admin.get_admin_keyboard())
-    assert (
-        labels
-        == {
-            "ru": [
-                "Ассортимент Книги",
-                "Добавить рецепт",
-                "Информация о пользователях",
-                "Назад на главную ↩️",
-            ],
-            "en": [
-                "Cookbook contents",
-                "Add recipe",
-                "User information",
-                "Back to main ↩️",
-            ],
-        }[language]
-    )
+    assert labels == [
+        "Ассортимент 📖", "Добавить 📃", "Синхронизировать 🔄",
+        "Информация 👨‍👩‍👦‍👦", "Назад на главную ↩️",
+    ]
+    assert [len(row) for row in admin.get_admin_keyboard().keyboard] == [3, 1, 1]
     for step in (
         admin.AddProduct.recipe_name,
         admin.AddProduct.author,
@@ -360,5 +353,4 @@ def test_admin_uses_repository_catalog_not_import_time_translation(ui: Ui) -> No
     ):
         prompt = admin.get_step_prompt(step.state)
         assert prompt
-        if language == "en":
-            assert not re.search("[А-Яа-яЁё]", prompt)
+        assert re.search("[А-Яа-яЁё]", prompt)

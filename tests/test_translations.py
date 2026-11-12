@@ -102,10 +102,11 @@ def test_template_matches_only_current_ui_sources() -> None:
         ROOT / "app.py",
         *sorted((ROOT / "handlers").glob("*.py")),
         *sorted((ROOT / "common").glob("*.py")),
+        ROOT / "prototypes" / "wordli" / "bot_texts.py",
     ]
     for path in sources:
         for _, message, _, context in extract_from_file(
-            "python", path, keywords={"_": None, "__": None}
+            "python", path, keywords={"_": None, "__": None, "gettext": None}
         ):
             expected.add((message, context))
     with (ROOT / "locales" / "messages.pot").open("rb") as stream:
@@ -118,9 +119,29 @@ def test_template_matches_only_current_ui_sources() -> None:
     assert actual == expected
     for message in template:
         for filename, _ in message.locations:
-            assert filename == "app.py" or filename.startswith(
+            assert filename in {
+                "app.py", "prototypes/wordli/bot_texts.py",
+            } or filename.startswith(
                 ("handlers/", "common/")
             )
+
+
+@pytest.mark.parametrize("language", ["ru", "en"])
+def test_game_invitation_and_reminder_notice_have_compiled_translations(
+    language: str,
+) -> None:
+    """Общий текст бота переводится, не затрагивая русский словарь самой игры."""
+    translator = _translator(language)
+    notice = "Из-за особенностей механики игры игра пока доступна только на русском языке"
+    reminder = "Пора сыграть в 5БУКВ! Сегодня вас ждёт новое слово."
+    assert translator.gettext(notice) == (
+        notice if language == "ru"
+        else "Due to the game's mechanics, it is currently available only in Russian"
+    )
+    assert translator.gettext(reminder) == (
+        reminder if language == "ru"
+        else "Time to play 5БУКВ! A new word is waiting for you today."
+    )
 
 
 def test_russian_catalog_keeps_new_messages_in_russian() -> None:
@@ -383,5 +404,7 @@ def test_english_catalog_has_no_untranslated_russian_ui() -> None:
     for message in _catalog("en"):
         if not message.id or not isinstance(message.string, str):
             continue
-        text = message.string.replace("4ПО5", "").replace("Т-4", "")
+        text = (
+            message.string.replace("5БУКВ", "").replace("4ПО5", "").replace("Т-4", "")
+        )
         assert not re.search("[А-Яа-яЁё]", text), message.id

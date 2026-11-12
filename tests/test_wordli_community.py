@@ -182,18 +182,65 @@ async def test_public_settings_hide_name_and_internal_fields(
     assert data["name"] == "Иван Тест"
 
 
-async def test_leaderboard_empty_and_ten_game_qualification(
+async def test_leaderboard_empty_and_five_game_qualification(
     community: WordliStorage,
 ) -> None:
-    """Незавершённые и первые девять игр не создают место в рейтинге."""
+    """Первые четыре игры не создают место, пятая допускает участника."""
     assert (await community.leaderboard(USER_ID))["rows"] == []
-    await seed(community, USER_ID, 9)
-    await seed(community, USER_ID + 1, 10)
+    await seed(community, USER_ID, 4)
+    await seed(community, USER_ID + 1, 5)
     board = await community.leaderboard(USER_ID)
     assert board["total"] == 1
     assert board["self_eligible"] is False
-    assert board["rows"][0]["played"] == 10
+    assert board["rows"][0]["played"] == 5
     assert board["rows"][0]["is_self"] is False
+
+
+@pytest.mark.parametrize("played,eligible", [(4, False), (5, True), (6, True)])
+async def test_leaderboard_qualification_boundaries(
+    community: WordliStorage,
+    played: int,
+    eligible: bool,
+) -> None:
+    """Граница допуска совпадает с появлением очков без изменения профиля."""
+    await seed(community, USER_ID, played)
+    async with community._database.connect() as connection:
+        before = (await connection.execute(select(profiles_table))).mappings().one()
+    board = await community.leaderboard(USER_ID)
+    assert board["self_eligible"] is eligible
+    assert board["total"] == int(eligible)
+    if eligible:
+        row = board["rows"][0]
+        assert row["played"] == played
+        assert isinstance(row["score"], int)
+    else:
+        assert board["rows"] == []
+    async with community._database.connect() as connection:
+        after = (await connection.execute(select(profiles_table))).mappings().one()
+    assert dict(after) == dict(before)
+
+
+async def test_five_losses_qualify_with_zero_score(
+    community: WordliStorage,
+) -> None:
+    """Поражения входят в пять завершённых игр и дают ноль очков."""
+    await seed(community, USER_ID, 5)
+    records = history(community._rules, 5)
+    for record in records:
+        wrong = next(
+            word for word in community._rules._answers if word != record["answer"]
+        )
+        record["guesses"] = [wrong] * 6
+    async with community._database.begin() as connection:
+        await connection.execute(
+            profiles_table.update()
+            .where(profiles_table.c.user_id == USER_ID)
+            .values(history=records)
+        )
+    board = await community.leaderboard(USER_ID)
+    assert board["self_eligible"] is True
+    assert board["rows"][0]["played"] == 5
+    assert board["rows"][0]["score"] == 0
 
 
 async def test_leaderboard_dense_rank_and_safe_public_columns(

@@ -14,7 +14,7 @@ from handlers import navigation, other
 async def test_games_menu_has_new_label_and_original_routes(
     language: str,
 ) -> None:
-    """Новая подпись не меняет WebApp, заглушку и возврат."""
+    """Меню сохраняет приглашение, WebApp и возврат, но скрывает вторую игру."""
     i18n = I18n(path=str(ROOT / "locales"), domain="bot_00_template")
     bot = SimpleNamespace(
         test_mode=True, wordli_webapp_url="https://example.invalid/wordli",
@@ -30,13 +30,18 @@ async def test_games_menu_has_new_label_and_original_routes(
 
     invitation = message.answer.await_args_list[-1]
     buttons = invitation.kwargs["reply_markup"].inline_keyboard
-    assert [len(row) for row in buttons] == [2, 1]
+    assert [len(row) for row in buttons] == [1, 1]
+    assert invitation.args[0] == (
+        "Which game shall we play?\n\n"
+        "(Due to the game's mechanics, it is currently available only in Russian)"
+        if language == "en" else "В какую игру сыграем?"
+    )
     assert buttons[0][0].text == "5БУКВ"
     assert buttons[0][0].web_app.url == bot.wordli_webapp_url
-    assert buttons[0][1].text == "4ПО5"
-    assert buttons[0][1].callback_data == "wordli_dimensions_stub"
-    assert buttons[0][1].web_app is None
     assert buttons[1][0].callback_data == "wordli_back_to_main"
+    assert buttons[1][0].text == (
+        "Back to main ↩️" if language == "en" else "Назад на главную ↩️"
+    )
 
 
 @pytest.mark.parametrize("language", ["ru", "en"])

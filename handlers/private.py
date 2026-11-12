@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from aiohttp import ClientError
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
@@ -36,6 +36,8 @@ private_router.edited_message.filter(ChatTypeFilter(["private"]))
 # Создаем константы для текстов, которые используются в декораторах
 BACK_TO_MAIN = __("Назад на главную ↩️")
 CATS = __("Котики 🐱")
+# Эффект самого сообщения ❤️; обычная реакция под фотографией сохраняется.
+CAT_HEART_EFFECT_ID = "5159385139981059251"
 
 
 # команда /main, кнопка "назад на главную"
@@ -171,7 +173,7 @@ async def callback_about(callback: CallbackQuery, state: FSMContext):
 # кнопка "Котики"
 @private_router.message(F.text == CATS)
 async def cat_cmd(message: Message, workflow_data: dict[str, object]) -> None:
-    """Отправляет котика и отмечает архивное фото сердечком."""
+    """Отправляет архивное фото с эффектом сердечек и обычной реакцией."""
     # вероятность 20% для выбора локального изображения с Кет
     if r.random() < 0.2:
         image_folder = "common/image_cat"
@@ -184,7 +186,15 @@ async def cat_cmd(message: Message, workflow_data: dict[str, object]) -> None:
         if images:
             random_image = r.choice(images)
             photo = FSInputFile(random_image)
-            sent_photo = await message.answer_photo(photo)
+            try:
+                sent_photo = await message.answer_photo(
+                    photo, message_effect_id=CAT_HEART_EFFECT_ID
+                )
+            except TelegramBadRequest as error:
+                if "effect" not in error.message.casefold():
+                    raise
+                logger.warning("Эффект сердечек недоступен; фото отправляется без него")
+                sent_photo = await message.answer_photo(photo)
             try:
                 await sent_photo.react([ReactionTypeEmoji(emoji="❤")])
             except (

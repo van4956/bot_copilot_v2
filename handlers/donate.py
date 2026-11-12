@@ -93,11 +93,29 @@ async def cmd_donate(message: Message, state: FSMContext) -> None:
     await state.set_state(Donate.donate_input)
 
 
-@donate_router.callback_query(F.data == "donate")
+@donate_router.callback_query(F.data == "donate", F.message.chat.type == "private")
 async def callback_donate(callback: CallbackQuery, state: FSMContext) -> None:
-    """Открывает донаты по кнопке меню."""
-    if isinstance(callback.message, Message):
+    """Заменяет кликнутую карточку информации выбором суммы доната."""
+    message = callback.message
+    if not isinstance(message, Message) or message.chat.type != "private":
+        await callback.answer()
+        return
+    try:
         await cmd_donate(callback.message, state)
+    except (TelegramAPIError, TimeoutError):
+        logger.warning("Не удалось подтвердить открытие экрана доната")
+        await callback.answer()
+        return
+    try:
+        await message.delete()
+    except (TelegramAPIError, TimeoutError):
+        try:
+            await message.edit_reply_markup(reply_markup=None)
+        except (TelegramAPIError, TimeoutError):
+            logger.warning("Не удалось убрать старые кнопки информации")
+    data = await state.get_data()
+    if data.get("last_message_id") == message.message_id:
+        await state.update_data(last_message_id=None)
     await callback.answer()
 
 

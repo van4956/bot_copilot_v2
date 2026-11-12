@@ -325,6 +325,10 @@ button:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.stat-score-number { position: relative; display: block; line-height: 1; }
+.stat-score-delta { position: absolute; top: 50%; left: calc(100% + 3px); transform: translateY(-50%); color: #929292; font-size: 10px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat-score-number--compact .stat-value { font-size: 17px; }
+
 .distribution-section { margin-top: 32px; }
 
 .distribution-section h2 {
@@ -439,18 +443,18 @@ button:focus-visible {
   display: grid;
   gap: 24px;
   padding: 24px 20px;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.45;
 }
-.rules-content.formula-content h2 { margin: 0; font-size: 24px; font-weight: 400; line-height: 1.3; }
-.formula-content h3 { margin: 0; font-size: 18px; font-weight: 400; line-height: 1.45; }
+.rules-content.formula-content h2 { margin: 0; font-size: 22px; font-weight: 400; line-height: 1.3; }
+.formula-content h3 { margin: 0; font-size: 16px; font-weight: 400; line-height: 1.45; }
 .formula-content ul { margin: 11px 0 0; padding-left: 17px; }
 .formula-content li { padding-left: 1px; }
 .formula-content li + li { margin-top: 6px; }
 .formula-content b { font-weight: 500; }
 .formula-quality { display: inline-block; width: auto; height: 2.2em; vertical-align: middle; }
-.formula-content .formula-note { margin: 0; color: #b7b7b7; font-size: 15px; line-height: 1.45; }
-.score-formula { margin-top: 15px; min-width: 0; text-align: center; }
+.formula-content .formula-note { margin: 0; color: #b7b7b7; font-size: 13px; line-height: 1.45; }
+.score-formula { margin-top: 15px; min-width: 0; padding: 16px 8px; border-radius: 12px; background: #ffffff09; text-align: center; }
 .score-formula img { display: block; width: 100%; height: auto; max-width: 520px; margin: 0 auto; }
 
 .leaderboard-content { padding: 20px 15px; border-radius: 24px; background: var(--surface); }
@@ -461,14 +465,16 @@ button:focus-visible {
 .leaderboard-table th:nth-child(2), .leaderboard-table td:nth-child(2) { width: 62px; text-align: right; }
 .leaderboard-table th:nth-child(3), .leaderboard-table td:nth-child(3) { width: 66px; text-align: right; }
 .leaderboard-table td { padding: 14px 8px; border-top: 1px solid #ffffff0c; font-variant-numeric: tabular-nums; vertical-align: middle; }
+.leaderboard-table tbody > tr:first-child td, .leaderboard-separator + tr td { border-top: 0; }
 .leaderboard-name { display: flex; align-items: baseline; gap: 10px; }
-.leaderboard-name span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.leaderboard-label { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; }
 .leaderboard-rank { flex: 0 0 22px; color: var(--muted); font-size: 12px; }
-.leaderboard-self td { background: #ffffff09; }
+.leaderboard-self td { border-top: 0; background: #ffffff09; }
+.leaderboard-self + tr:not(.leaderboard-separator) td { border-top: 0; }
 .leaderboard-self td:first-child { border-radius: 8px 0 0 8px; }
 .leaderboard-self td:last-child { border-radius: 0 8px 8px 0; }
 .leaderboard-self .leaderboard-name { font-weight: 500; }
-.leaderboard-separator td { height: 15px; padding: 0; border-top: 1px dashed #666666; }
+.leaderboard-separator td { height: 15px; padding: 0; border-top: 0; }
 
 .next-word-countdown {
   display: block;
@@ -524,8 +530,8 @@ button:focus-visible {
   background: var(--surface);
 }
 
-.rules-content h2 { margin: 0 0 20px; font-size: 24px; font-weight: 400; line-height: 1.3; }
-.rules-content p { margin: 0 0 25px; color: #e2e2e2; font-size: 18px; line-height: 1.45; }
+.rules-content h2 { margin: 0 0 20px; font-size: 22px; font-weight: 400; line-height: 1.3; }
+.rules-content p { margin: 0 0 25px; color: #e2e2e2; font-size: 16px; line-height: 1.45; }
 .rules-content p:last-child { margin-bottom: 0; }
 .rules-content hr { height: 1px; margin: 29px 0; border: 0; background: #585858; }
 
@@ -602,6 +608,8 @@ button:focus-visible {
 .progress-node.is-complete .progress-point { color: #242424; background: var(--yellow); }
 .progress-point svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .progress-word { min-height: 17px; max-width: 100%; color: #aaa; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.progress-word--pending { display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+.progress-placeholder { flex: 0 0 5px; width: 5px; height: 5px; border-radius: 50%; background: #555555; }
 .progress-node.is-complete .progress-word { color: #e7e7e7; }
 
 .primary-button.replay-button { min-height: 65px; border-radius: 22px; font-size: 21px; font-weight: 400; }
@@ -725,18 +733,20 @@ button:focus-visible {
   .header-actions .icon-button { flex-basis: 34px; width: 34px; }
   .wordmark span { width: 27px; height: 30px; font-size: 24px; }
   .stat-label { font-size: 11px; }
+  .stat-score-delta { font-size: 8px; }
+  .stat-score-number--compact .stat-value { font-size: 14px; }
   .page-heading h1 { font-size: 23px; }
   .settings-block { padding: 22px 20px; }
   .reminder-heading h2 { font-size: 23px; }
   .rules-content { padding-right: 18px; padding-left: 18px; }
-  .rules-content p { font-size: 17px; }
+  .rules-content p { font-size: 15px; }
   .progress-node:not(:first-child)::before { top: 22px; }
   .progress-point { font-size: 20px; }
   .progress-word { font-size: 11px; }
   .summary-title { font-size: 27px; }
-  .rules-content.formula-content { padding: 23px 10px; font-size: 17px; }
-  .formula-content h3 { font-size: 17px; }
-  .formula-content .formula-note { font-size: 14px; }
+  .rules-content.formula-content { padding: 23px 10px; font-size: 15px; }
+  .formula-content h3 { font-size: 15px; }
+  .formula-content .formula-note { font-size: 12px; }
   .leaderboard-content { padding-right: 9px; padding-left: 9px; }
   .leaderboard-table { font-size: 13px; }
   .leaderboard-table td, .leaderboard-table th { padding-right: 5px; padding-left: 5px; }

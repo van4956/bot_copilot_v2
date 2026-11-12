@@ -118,6 +118,9 @@ def test_bot_receives_url_only_in_test_mode(
 def words_state(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Изолирует перевод и создаёт незавершённый диалог."""
     monkeypatch.setattr(navigation, "_", lambda text: text)
+    monkeypatch.setattr(
+        navigation, "get_i18n", lambda: SimpleNamespace(current_locale="ru"),
+    )
     return SimpleNamespace(
         get_data=AsyncMock(return_value={"locale": "ru", "amount": "12"}),
         set_state=AsyncMock(),
@@ -129,7 +132,7 @@ def words_state(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 async def test_test_words_launches_inline_webapp(
     words_state: SimpleNamespace, from_message: bool
 ) -> None:
-    """Тестовое меню предлагает готовую игру и отдельную заглушку."""
+    """Тестовое меню предлагает только готовую игру и возврат на главную."""
     bot = SimpleNamespace(test_mode=True, wordli_webapp_url=TEST_URL)
     message = SimpleNamespace(answer=AsyncMock(), bot=bot)
     if from_message:
@@ -148,16 +151,15 @@ async def test_test_words_launches_inline_webapp(
     assert invitation_call.args == ("В какую игру сыграем?",)
     assert "message_effect_id" not in invitation_call.kwargs
     markup = invitation_call.kwargs["reply_markup"]
-    assert [len(row) for row in markup.inline_keyboard] == [2, 1]
+    assert [len(row) for row in markup.inline_keyboard] == [1, 1]
     button = markup.inline_keyboard[0][0]
     assert button.text == "5БУКВ"
     assert button.web_app.url == TEST_URL
     assert button.callback_data is None
-    dimensions = markup.inline_keyboard[0][1]
-    assert dimensions.text == "4ПО5"
-    assert dimensions.callback_data == "wordli_dimensions_stub"
-    assert dimensions.web_app is None
-    assert dimensions.url is None
+    assert all(
+        item.callback_data != "wordli_dimensions_stub"
+        for row in markup.inline_keyboard for item in row
+    )
     back = markup.inline_keyboard[1][0]
     assert back.text == "Назад на главную ↩️"
     assert back.callback_data == "wordli_back_to_main"
@@ -184,13 +186,22 @@ def _invitation_message() -> Message:
 
 
 @pytest.mark.parametrize("already_deleted", [False, True])
+@pytest.mark.parametrize("message_kind", ["invitation", "reminder"])
 async def test_wordli_back_deletes_invitation_and_restores_main(
     monkeypatch: pytest.MonkeyPatch,
     words_state: SimpleNamespace,
     already_deleted: bool,
+    message_kind: str,
 ) -> None:
-    """Возврат удаляет только приглашение и сохраняет язык диалога."""
+    """Возврат удаляет нажатое приглашение или напоминание, а не старое меню."""
     invitation = _invitation_message()
+    if message_kind == "reminder":
+        invitation = invitation.model_copy(
+            update={"text": "Пора сыграть в 5БУКВ! Сегодня вас ждёт новое слово."}
+        )
+    words_state.get_data.return_value = {
+        "locale": "ru", "last_message_id": 999, "amount": "12",
+    }
     assert invitation.from_user.is_bot is True
     callback = SimpleNamespace(message=invitation, answer=AsyncMock())
     bot = SimpleNamespace(test_mode=True, wordli_webapp_url=TEST_URL)

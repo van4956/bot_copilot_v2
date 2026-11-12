@@ -49,7 +49,7 @@
         <article class="stat-card"><strong class="stat-value" data-stat="average">—</strong><span class="stat-label">Попыток на победу</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="max-streak">0</strong><span class="stat-label">Максимальная серия</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="win-streak">0</strong><span class="stat-label">Текущая серия</span></article>
-        <article class="stat-card"><strong class="stat-value" data-stat="score">—</strong><span class="stat-label">Очков</span></article>
+        <article class="stat-card stat-card--score"><span class="stat-score-number"><strong class="stat-value" data-stat="score">—</strong><span class="stat-score-delta" data-score-delta hidden></span></span><span class="stat-label">Очков</span></article>
       </div>
       <section class="distribution-section" aria-labelledby="distribution-title">
         <h2 id="distribution-title">Распределение попыток</h2>
@@ -85,7 +85,7 @@
       </button>
       <button class="settings-block rules-link" type="button" data-action="open-leaderboard">
         <span class="rules-link-title">Рейтинг</span>
-        <span class="rules-link-caption">турнирная таблица</span>
+        <span class="rules-link-caption">топ участников</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
       </button>
     </section>
@@ -117,7 +117,7 @@
           <li>меньше попыток — выше результат.</li>
           <li>максимальная серия даёт дополнительный, но не решающий вклад.</li>
         </ul></section>
-        <p class="formula-note">Очки появляются после 10 завершённых игр. Незавершённые и просроченные партии в расчёт не входят. Поражения могут снижать очки.</p>
+        <p class="formula-note">Очки появляются после 5 завершённых игр. Незавершённые и просроченные партии в расчёт не входят. Поражения могут снижать очки.</p>
       </article>
     </section>
 
@@ -131,7 +131,7 @@
       </div>
       <div class="leaderboard-content">
         <p id="leaderboard-status" class="leaderboard-status" role="status">Загрузка…</p>
-        <table id="leaderboard-table" class="leaderboard-table" aria-label="Турнирная таблица за всё время" hidden>
+        <table id="leaderboard-table" class="leaderboard-table" aria-label="Топ участников за всё время" hidden>
           <thead><tr><th scope="col">Имя</th><th scope="col">Игр</th><th scope="col">Очки</th></tr></thead>
           <tbody id="leaderboard-rows"></tbody>
         </table>

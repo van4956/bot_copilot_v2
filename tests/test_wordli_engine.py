@@ -867,7 +867,12 @@ def test_legacy_duplicates_are_preserved_but_not_selected_again(
     "played,wins,average,maximum,pool,expected",
     [
         (0, 0, None, 0, 5000, None),
-        (9, 9, 1, 9, 5000, None),
+        (4, 4, 1, 4, 5000, None),
+        (4, 0, None, 0, 5000, None),
+        (5, 0, None, 0, 5000, 0),
+        (5, 5, 1, 5, 5000, 254),
+        (6, 6, 1, 6, 5000, 279),
+        (9, 9, 1, 9, 5000, 343),
         (10, 0, None, 0, 5000, 0),
         (10, 10, 1, 10, 5000, 361),
         (5000, 5000, 1, 5000, 5000, 10000),
@@ -883,8 +888,31 @@ def test_rating_boundaries(
     pool: int,
     expected: int | None,
 ) -> None:
-    """Очки целые, ограничены и недоступны до десяти завершённых игр."""
+    """Очки целые, ограничены и недоступны до пяти завершённых игр."""
     assert calculate_score(played, wins, average, maximum, pool) == expected
+
+
+def test_rating_threshold_counts_only_completed_games(
+    engine: LocalGameEngine,
+) -> None:
+    """Просрочки и активная партия не приближают допуск к пяти играм."""
+    history = [
+        _win(engine, TODAY - timedelta(days=7)),
+        _loss(engine, TODAY - timedelta(days=6)),
+        _win(engine, TODAY - timedelta(days=5)),
+        _loss(engine, TODAY - timedelta(days=4)),
+        {"day": (TODAY - timedelta(days=3)).isoformat(), "guesses": []},
+        {"day": TODAY.isoformat(), "guesses": []},
+    ]
+    stats = engine.statistics(history, TODAY)
+    assert stats["played"] == 4
+    assert stats["score"] is None
+
+    history[-1] = _loss(engine, TODAY)
+    stats = engine.statistics(history, TODAY)
+    assert stats["played"] == 5
+    assert stats["wins"] == 2
+    assert isinstance(stats["score"], int)
 
 
 def test_loss_can_reduce_rating() -> None:

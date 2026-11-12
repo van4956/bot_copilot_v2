@@ -221,6 +221,50 @@ async def test_authenticated_bootstrap_hides_history_and_answer(
     assert current["stats"]["played"] == 0
 
 
+async def test_score_delta_survives_api_retry_and_storage_reopen(
+    app_environment: AppEnvironment,
+) -> None:
+    """Дельта приходит из серверной истории и не сбрасывается при чтении."""
+    app = app_environment.app
+    current = await state(app)
+    previous_score = None
+    last_payload = None
+    last_response = None
+    for played in range(1, 7):
+        answer = await assigned_answer(app_environment)
+        last_payload = {**action_payload(current), "guess": answer}
+        response = await request(app, "POST", "/api/guess", last_payload)
+        assert response.status == 200
+        current = result(response)
+        last_response = current
+        assert current["stats"]["played"] == played
+        if played <= 5:
+            assert current["stats"]["score_delta"] is None
+        else:
+            assert current["stats"]["score_delta"] == (
+                current["stats"]["score"] - previous_score
+            )
+            assert current["stats"]["score_delta"] > 0
+        previous_score = current["stats"]["score"]
+        if played < 6:
+            next_response = await request(
+                app, "POST", "/api/next", action_payload(current)
+            )
+            assert next_response.status == 200
+            current = result(next_response)
+
+    repeated = await request(app, "POST", "/api/guess", last_payload)
+    assert repeated.status == 200
+    assert result(repeated) == last_response
+    assert (await state(app))["stats"] == last_response["stats"]
+    reopened = WordliStorage(
+        app_environment.database,
+        app_environment.engine,
+        clock=app_environment.clock.now,
+    )
+    assert (await reopened.bootstrap(USER_ID))["stats"] == last_response["stats"]
+
+
 @pytest.mark.parametrize("endpoint", ["state", "guess", "next", "draft"])
 async def test_all_api_endpoints_require_signed_telegram_identity(
     app_environment: AppEnvironment, endpoint: str

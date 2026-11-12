@@ -186,6 +186,9 @@ async def test_invitation_ignores_obsolete_custom_emoji_and_effects(
 ) -> None:
     """Приглашение использует обычный джойстик без сущностей и эффектов."""
     monkeypatch.setattr(navigation, "_", lambda text: text)
+    monkeypatch.setattr(
+        navigation, "get_i18n", lambda: SimpleNamespace(current_locale="ru"),
+    )
     message = SimpleNamespace(answer=AsyncMock())
     state = SimpleNamespace(
         get_data=AsyncMock(return_value={"locale": "ru"}),
@@ -207,7 +210,13 @@ async def test_invitation_ignores_obsolete_custom_emoji_and_effects(
 
 @pytest.mark.parametrize(
     "language,prompt",
-    [("ru", "В какую игру сыграем?"), ("en", "Which game shall we play?")],
+    [
+        ("ru", "В какую игру сыграем?"),
+        (
+            "en", "Which game shall we play?\n\n"
+            "(Due to the game's mechanics, it is currently available only in Russian)",
+        ),
+    ],
 )
 async def test_games_menu_uses_selected_locale(
     language: str, prompt: str
@@ -224,7 +233,7 @@ async def test_games_menu_uses_selected_locale(
     invitation = message.answer.await_args_list[1]
     assert invitation.args == (prompt,)
     markup = invitation.kwargs["reply_markup"]
-    assert [len(row) for row in markup.inline_keyboard] == [2, 1]
+    assert [len(row) for row in markup.inline_keyboard] == [1, 1]
     assert markup.inline_keyboard[0][0].text == "5БУКВ"
     assert markup.inline_keyboard[0][0].web_app.url == TEST_URL
-    assert markup.inline_keyboard[0][1].callback_data == "wordli_dimensions_stub"
+    assert markup.inline_keyboard[1][0].callback_data == "wordli_back_to_main"

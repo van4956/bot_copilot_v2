@@ -3,6 +3,7 @@
 import datetime
 import logging
 import math
+from decimal import Decimal, ROUND_HALF_UP
 from html import escape
 
 import aiohttp
@@ -207,10 +208,16 @@ def _wind_direction(degrees: object) -> str:
     return arrows[int((direction + 22.5) // 45) % 8]
 
 
+def _rounded_temperature(value: object) -> str:
+    """Округляет градусы до целого, половины — от нуля."""
+    number = Decimal(str(_finite_number(value)))
+    return str(int(number.to_integral_value(rounding=ROUND_HALF_UP)))
+
+
 def _weather_values(entry: dict) -> tuple[str, str, str, str, str]:
-    """Подготавливает столбцы, сохраняя реальные значения погоды."""
+    """Округляет только температуру и подготавливает остальные столбцы."""
     return (
-        f"{_finite_number(entry['main']['temp']):.1f}",
+        _rounded_temperature(entry["main"]["temp"]),
         f"{_finite_number(entry['main']['humidity']):g}",
         f"{_finite_number(entry['wind']['speed']):.1f}",
         _wind_direction(entry["wind"].get("deg")),

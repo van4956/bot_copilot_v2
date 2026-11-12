@@ -64,7 +64,13 @@ def test_statistics_does_not_allocate_new_game() -> None:
 
 @pytest.mark.parametrize(
     "played,wins,average,streak,pool",
-    [(10, 7, 3.5, 4, 1758), (100, 95, 2.5, 30, 1758), (5000, 4000, 6, 100, 5000)],
+    [
+        (5, 3, 3.5, 2, 1758),
+        (6, 5, 3.5, 4, 1758),
+        (10, 7, 3.5, 4, 1758),
+        (100, 95, 2.5, 30, 1758),
+        (5000, 4000, 6, 100, 5000),
+    ],
 )
 def test_v2_weights_match_approved_formula(
     played: int, wins: int, average: float, streak: int, pool: int

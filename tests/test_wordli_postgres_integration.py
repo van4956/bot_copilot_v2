@@ -265,7 +265,7 @@ async def test_postgres_leaderboard_keeps_histories_and_hides_private_fields(
     await create_schema(database)
     rules = LocalGameEngine()
     storage = WordliStorage(database, rules, clock=lambda: NOW)
-    for user_id, played in [(USER, 10), (USER + 1, 12)]:
+    for user_id, played in [(USER, 5), (USER + 1, 6), (USER + 2, 4)]:
         history = [
             {
                 "day": (NOW.date() - timedelta(days=played - index)).isoformat(),
@@ -294,7 +294,7 @@ async def test_postgres_leaderboard_keeps_histories_and_hides_private_fields(
             )
         ).all()
     result = await storage.leaderboard(USER)
-    assert [row["played"] for row in result["rows"]] == [12, 10]
+    assert [row["played"] for row in result["rows"]] == [6, 5]
     assert result["self_eligible"] is True
     assert all(
         set(row) == {"rank", "name", "played", "score", "is_self"}

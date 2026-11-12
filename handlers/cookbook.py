@@ -1,21 +1,23 @@
 """Просмотр книги рецептов с безопасными подписями и пагинацией."""
 
+import hashlib
 import logging
 from html import escape
 from pathlib import Path
 from typing import Any
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto, Message
+from aiogram.utils.i18n import get_i18n
 from aiogram.utils.i18n import gettext as _
 from aiogram.utils.i18n import lazy_gettext as __
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
-from database.orm_cookbook import orm_get_recipes
+from database.orm_cookbook_translations import orm_get_localized_recipes
 from filters.chat_type import ChatTypeFilter
 
 logger = logging.getLogger(__name__)
@@ -34,11 +36,11 @@ def _clip_text(value: str, limit: int) -> str:
     return clipped.decode("utf-16-le", errors="ignore") + "…"
 
 
-def format_recipe_caption(recipe: Any) -> str:
+def format_recipe_caption(recipe: Any, *, author_label: str | None = None) -> str:
     """Создаёт экранированную подпись, не разрезая HTML-разметку."""
     name = _clip_text(str(recipe.recipe_name or ""), 150)
     author = _clip_text(str(recipe.author or ""), 150)
-    author_label = _("Автор:")
+    author_label = _("Автор:") if author_label is None else author_label
     heading = f"{name}\n{author_label} {author}\n\n"
     remaining = 1024 - len(heading.encode("utf-16-le")) // 2
     description = _clip_text(str(recipe.description or ""), remaining)
@@ -46,6 +48,12 @@ def format_recipe_caption(recipe: Any) -> str:
         f"<b>{escape(name)}</b>\n<i>{escape(author_label)} {escape(author)}</i>\n\n"
         f"{escape(description)}"
     )
+
+
+def _caption_revision(recipe: Any, caption: str, locale: str) -> str:
+    """Отслеживает видимый текст, фотографию и язык открытой карточки."""
+    content = f"{locale}\0{recipe.image}\0{caption}"
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def resolve_recipe_photo(
@@ -96,11 +104,12 @@ async def process_cookbook_command(
 ) -> None:
     """Открывает книгу и восстанавливает допустимую страницу."""
     try:
-        book = await orm_get_recipes(session)
+        locale = get_i18n().current_locale
+        book = await orm_get_localized_recipes(session, locale)
         if not book:
             await state.update_data(page=1)
             await message.answer(
-                _("Книга рецептов пуста"),
+                _("В книге пока нет рецептов."),
                 reply_markup=keyboard.start_keyboard(
                     bot=getattr(message, "bot", None)
                 ),
@@ -108,14 +117,20 @@ async def process_cookbook_command(
             return
         page = normalize_page((await state.get_data()).get("page"), len(book))
         recipe = book[page - 1]
+        caption = format_recipe_caption(recipe)
         await message.answer_photo(
             photo=resolve_recipe_photo(
                 recipe.image, test_mode=getattr(message.bot, "test_mode", False)
             ),
-            caption=format_recipe_caption(recipe),
+            caption=caption,
             reply_markup=_page_keyboard(page, len(book)),
         )
-        await state.update_data(page=page, cookbook_recipe_id=recipe.recipe_id)
+        await state.update_data(
+            page=page,
+            cookbook_recipe_id=recipe.recipe_id,
+            cookbook_revision=_caption_revision(recipe, caption, locale),
+            cookbook_total=len(book),
+        )
     except (SQLAlchemyError, TelegramAPIError, ValueError):
         logger.exception("Не удалось открыть книгу рецептов")
         await message.answer(_("Ошибка при выполнении команды /cookbook"))
@@ -130,13 +145,14 @@ async def _turn_page(
         await callback.answer(_("Откройте книгу заново"))
         return
     try:
-        book = await orm_get_recipes(session)
+        locale = get_i18n().current_locale
+        book = await orm_get_localized_recipes(session, locale)
         if not book:
             await state.update_data(page=1)
-            await callback.answer(_("Книга рецептов пуста"))
+            await callback.answer(_("В книге пока нет рецептов."))
             await callback.message.delete()
             await callback.message.answer(
-                _("Книга рецептов пуста"),
+                _("В книге пока нет рецептов."),
                 reply_markup=keyboard.start_keyboard(
                     bot=getattr(callback, "bot", None)
                 ),
@@ -147,22 +163,33 @@ async def _turn_page(
         current = normalize_page(saved, len(book))
         page = normalize_page(current + direction, len(book))
         recipe = book[page - 1]
+        caption = format_recipe_caption(recipe)
+        revision = _caption_revision(recipe, caption, locale)
         needs_refresh = (
             page != current or saved != current
             or state_data.get("cookbook_recipe_id") != recipe.recipe_id
+            or state_data.get("cookbook_revision") != revision
+            or state_data.get("cookbook_total") != len(book)
         )
         if needs_refresh:
-            await callback.message.edit_media(
-                media=InputMediaPhoto(
-                    media=resolve_recipe_photo(
-                        recipe.image,
-                        test_mode=getattr(callback.bot, "test_mode", False),
+            try:
+                await callback.message.edit_media(
+                    media=InputMediaPhoto(
+                        media=resolve_recipe_photo(
+                            recipe.image,
+                            test_mode=getattr(callback.bot, "test_mode", False),
+                        ),
+                        caption=caption,
                     ),
-                    caption=format_recipe_caption(recipe),
-                ),
-                reply_markup=_page_keyboard(page, len(book)),
-            )
-        await state.update_data(page=page, cookbook_recipe_id=recipe.recipe_id)
+                    reply_markup=_page_keyboard(page, len(book)),
+                )
+            except TelegramBadRequest as error:
+                if "message is not modified" not in error.message.casefold():
+                    raise
+        await state.update_data(
+            page=page, cookbook_recipe_id=recipe.recipe_id,
+            cookbook_revision=revision, cookbook_total=len(book),
+        )
         await callback.answer()
     except (SQLAlchemyError, TelegramAPIError, ValueError):
         logger.exception("Не удалось перелистнуть книгу рецептов")

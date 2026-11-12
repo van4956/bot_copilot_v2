@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gettext
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -12,11 +13,19 @@ from typing import TYPE_CHECKING, Literal
 
 import aiohttp
 
+from config_data.config import ROOT, validate_wordli_url
+
+from .bot_texts import (
+    REMINDER_BACK_TEXT,
+    REMINDER_TEXT,
+    normalize_game_locale,
+    with_game_language_notice,
+)
+
 if TYPE_CHECKING:
     from .storage import WordliStorage
 
 logger = logging.getLogger(__name__)
-REMINDER_TEXT = "Пора сыграть в 5БУКВ! Сегодня вас ждёт новое слово."
 POLL_INTERVAL = 15.0
 SEND_INTERVAL = 0.1
 MAX_BATCH_SIZE = 100
@@ -43,19 +52,67 @@ class ReminderResult:
 
 
 class TelegramReminderSender:
-    """Посылает только текст через переданную HTTP-сессию."""
+    """Посылает напоминание с кнопками игры и возврата на главную."""
 
-    def __init__(self, session: aiohttp.ClientSession, token: str) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        token: str,
+        public_origin: str,
+        *,
+        locale_reader: Callable[[int], Awaitable[str]] | None = None,
+    ) -> None:
         """Не создаёт сессию и не выполняет сетевых запросов."""
+        game_url = validate_wordli_url(public_origin, test_mode=True)
+        if not game_url:
+            raise ValueError("Для напоминания нужен HTTPS-адрес игры")
         self._session = session
         self._url = f"https://api.telegram.org/bot{token}/sendMessage"
+        self._game_url = game_url
+        self._locale_reader = locale_reader
 
     async def send(self, user_id: int) -> ReminderResult:
         """Не повторяет отправку, если Telegram мог уже принять сообщение."""
+        locale = (
+            await self._locale_reader(user_id)
+            if self._locale_reader is not None
+            else "ru"
+        )
+        try:
+            locale = normalize_game_locale(locale)
+        except ValueError:
+            logger.warning("Некорректная локаль напоминания; используется русский")
+            locale = "ru"
+        languages = (
+            ["ru"]
+            if locale == "ru"
+            else [locale.replace("-", "_"), locale.split("-")[0], "en"]
+        )
+        translate = gettext.translation(
+            "bot_00_template", localedir=ROOT / "locales", languages=languages
+        ).gettext
+        reply_markup = {
+            "inline_keyboard": [
+                [{"text": "5БУКВ", "web_app": {"url": self._game_url}}],
+                [
+                    {
+                        "text": translate(REMINDER_BACK_TEXT),
+                        "callback_data": "wordli_back_to_main",
+                    }
+                ],
+            ]
+        }
+
         try:
             async with self._session.post(
                 self._url,
-                json={"chat_id": user_id, "text": REMINDER_TEXT},
+                json={
+                    "chat_id": user_id,
+                    "text": with_game_language_notice(
+                        translate(REMINDER_TEXT), locale, translate
+                    ),
+                    "reply_markup": reply_markup,
+                },
                 allow_redirects=False,
             ) as response:
                 try:
@@ -190,13 +247,16 @@ async def reminder_service(
     storage: WordliStorage,
     token: str,
     *,
+    public_origin: str,
     allowed_user_ids: set[int] | frozenset[int] | None = None,
 ) -> AsyncIterator[None]:
     """Закрывает задачу до HTTP-сессии и внешнего пула БД."""
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=10, connect=5)
     ) as session:
-        sender = TelegramReminderSender(session, token)
+        sender = TelegramReminderSender(
+            session, token, public_origin, locale_reader=storage.user_locale
+        )
         worker = ReminderWorker(
             storage,
             sender.send,

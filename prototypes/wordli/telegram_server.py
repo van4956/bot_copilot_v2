@@ -402,6 +402,7 @@ def main() -> None:
                 async with reminder_service(
                     storage,
                     config.tg_bot.token_test,
+                    public_origin=args.public_origin,
                     allowed_user_ids=(
                         set(config.tg_bot.owner) | set(config.tg_bot.admin_list)
                     ),

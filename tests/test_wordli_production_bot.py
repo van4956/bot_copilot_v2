@@ -238,6 +238,9 @@ async def test_enabled_production_opens_games_menu(
     """Рабочее меню использует тот же WebApp и прежний возврат."""
     monkeypatch.setattr(keyboard, "_", lambda text: text)
     monkeypatch.setattr(navigation, "_", lambda text: text)
+    monkeypatch.setattr(
+        navigation, "get_i18n", lambda: SimpleNamespace(current_locale="ru"),
+    )
     bot = _bot(monkeypatch)
     state = SimpleNamespace(
         get_data=AsyncMock(return_value={"locale": "ru"}),
@@ -253,10 +256,9 @@ async def test_enabled_production_opens_games_menu(
     invitation = message.answer.await_args_list[1]
     assert invitation.args == ("В какую игру сыграем?",)
     buttons = invitation.kwargs["reply_markup"].inline_keyboard
-    assert [len(row) for row in buttons] == [2, 1]
+    assert [len(row) for row in buttons] == [1, 1]
     assert buttons[0][0].text == "5БУКВ"
     assert buttons[0][0].web_app.url == URL
-    assert buttons[0][1].callback_data == "wordli_dimensions_stub"
     assert buttons[1][0].callback_data == "wordli_back_to_main"
 
 

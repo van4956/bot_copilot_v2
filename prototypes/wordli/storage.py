@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import secrets
 import unicodedata
 from collections.abc import AsyncIterator, Callable
@@ -24,26 +25,35 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    column,
     select,
+    table,
     update,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import RowMapping
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
 )
 
+from .bot_texts import normalize_game_locale
 from .engine import (
     MAX_GAMES_PER_DAY,
+    MIN_RATED_GAMES,
     GameError,
     LocalGameEngine,
     normalize_draft,
 )
 
 wordli_metadata = MetaData()
+logger = logging.getLogger(__name__)
+_users_locale = table(
+    "users", column("user_id", BigInteger), column("locale", String(150))
+)
 profiles_table = Table(
     "wordli_profiles",
     wordli_metadata,
@@ -217,6 +227,38 @@ class WordliStorage:
         """Создаёт только самостоятельные таблицы Wordli."""
         async with self._database.begin() as connection:
             await connection.run_sync(wordli_metadata.create_all)
+
+    async def user_locale(self, user_id: int) -> str:
+        """Читает язык бота без создания профиля или изменения его настроек."""
+        _check_user(user_id)
+        try:
+            async with self._sessions() as session:
+                value = await session.scalar(
+                    select(_users_locale.c.locale).where(
+                        _users_locale.c.user_id == user_id
+                    )
+                )
+        except DBAPIError as error:
+            code = getattr(error.orig, "sqlstate", None) or getattr(
+                error.orig, "pgcode", None
+            )
+            missing_sqlite_table = self._dialect == "sqlite" and str(
+                error.orig
+            ).casefold() in {"no such table: users", "no such table: main.users"}
+            if code not in {"42P01", "42501"} and not missing_sqlite_table:
+                raise
+            logger.warning(
+                "Таблица или права чтения языка пользователя недоступны; "
+                "напоминание будет на русском языке"
+            )
+            return "ru"
+        if value is None:
+            return "ru"
+        try:
+            return normalize_game_locale(value)
+        except ValueError:
+            logger.warning("Некорректная локаль пользователя; используется русский")
+            return "ru"
 
     def _today(self) -> date:
         """Использует только осведомлённые о часовом поясе серверные часы."""
@@ -573,7 +615,7 @@ class WordliStorage:
             except GameError:
                 # Повреждённый профиль не меняем и не включаем в публичную доску.
                 continue
-            if stats["played"] < 10 or stats["score"] is None:
+            if stats["played"] < MIN_RATED_GAMES or stats["score"] is None:
                 continue
             data = profile["data"] if isinstance(profile["data"], dict) else {}
             participants.append(

@@ -5,6 +5,7 @@
     const STORAGE_KEY = 'wordli.local.v01';
     const WORD_LENGTH = 5;
     const ROW_COUNT = 6;
+    const LEADERBOARD_NAME_LIMIT = 14;
     const KEYBOARD_ROWS = ['ЙЦУКЕНГШЩЗХЪ', 'ФЫВАПРОЛДЖЭ', 'ЯЧСМИТЬБЮ'];
     const STATES = new Set(['correct', 'present', 'absent']);
     const STATE_LABELS = {
@@ -82,7 +83,7 @@
         catch (_) { return 'Etc/GMT-4'; }
     }
 
-    /** Принимает только публичные данные турнирной таблицы, без HTML и идентификаторов. */
+    /** Принимает только публичные данные рейтинга, без HTML и идентификаторов. */
     function validateLeaderboard(value) {
         const invalid = () => { throw new LocalApiError('invalid_response', 'Не удалось получить рейтинг'); };
         if (!value || !Array.isArray(value.rows) || value.rows.length > 10
@@ -92,11 +93,24 @@
         value.rows.forEach(row => {
             if (!row || typeof row.name !== 'string' || row.name.length > 256
                 || !Number.isInteger(row.rank) || row.rank < 1
-                || !Number.isInteger(row.played) || row.played < 10
+                || !Number.isInteger(row.played) || row.played < 5
                 || !Number.isInteger(row.score) || row.score < 0 || row.score > 10000
                 || typeof row.is_self !== 'boolean') invalid();
         });
         return value;
+    }
+
+    /** Ограничивает только отображение имени; две точки идут сверх 14 символов. */
+    function formatLeaderboardName(name, maxWidth = Infinity, measure = null, intl = Intl) {
+        const characters = typeof intl.Segmenter === 'function'
+            ? Array.from(new intl.Segmenter(undefined, {granularity: 'grapheme'}).segment(name), part => part.segment)
+            : Array.from(name);
+        let count = Math.min(characters.length, LEADERBOARD_NAME_LIMIT);
+        const candidate = () => characters.slice(0, count).join('') + (count < characters.length ? '..' : '');
+        if (measure && Number.isFinite(maxWidth)) {
+            while (count > 0 && measure(candidate()) > maxWidth) count -= 1;
+        }
+        return candidate();
     }
 
     function copyHistory(history) {
@@ -198,6 +212,9 @@
             || !(stats.average === null || (Number.isFinite(stats.average) && stats.average >= 0))
             || !(stats.score === undefined || stats.score === null
                 || (Number.isInteger(stats.score) && stats.score >= 0 && stats.score <= 10000))
+            || !(stats.score_delta === undefined || stats.score_delta === null
+                || (Number.isInteger(stats.score_delta) && Math.abs(stats.score_delta) <= 10000
+                    && Number.isInteger(stats.score)))
             || !Array.isArray(stats.distribution) || stats.distribution.length !== ROW_COUNT
             || stats.distribution.some(count => !Number.isInteger(count) || count < 0)) invalid();
         if (state.progression !== undefined) {
@@ -252,7 +269,24 @@
 
     function signature(history) { return JSON.stringify(history); }
     function gameIdentity(game) { return `${game.day}:${game.index ?? 0}`; }
-    function formatProgressWord(word) { return word ? word.toLocaleUpperCase('ru-RU') : '*****'; }
+    function formatProgressWord(word) { return word ? word.toLocaleUpperCase('ru-RU') : ''; }
+
+    /** Будущие слова скрыты пятью круглыми элементами, а не символами шрифта. */
+    function createProgressWord(doc, value) {
+        const word = doc.createElement('span');
+        word.className = 'progress-word';
+        if (value) word.textContent = formatProgressWord(value);
+        else {
+            word.className += ' progress-word--pending';
+            word.setAttribute('aria-hidden', 'true');
+            for (let index = 0; index < WORD_LENGTH; index += 1) {
+                const circle = doc.createElement('span');
+                circle.className = 'progress-placeholder';
+                word.appendChild(circle);
+            }
+        }
+        return word;
+    }
     function activeRecord(history, game) {
         const today = history.filter(record => record.day === game.day);
         const last = today.reduce((latest, record) => !latest || (record.index ?? 0) > (latest.index ?? 0) ? record : latest, null);
@@ -366,6 +400,14 @@
         };
     }
 
+    /** Скрывает нулевой прирост, первое начисление и старые ответы без дельты. */
+    function formatScoreDelta(stats) {
+        const delta = stats.score_delta;
+        if (!(stats.played > 5) || !Number.isInteger(stats.score)
+            || !Number.isInteger(delta) || Math.abs(delta) > 10000 || delta === 0) return '';
+        return delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`;
+    }
+
     /** Подключает локальную игру, анимации и экраны без сервисов бота. */
     function mount(doc, search = '') {
         const win = doc.defaultView;
@@ -404,6 +446,22 @@
         let settingsBusy = false;
         let timezoneRegistered = false;
         let leaderboardBusy = false;
+        let leaderboardMeasure;
+
+        function fitLeaderboardNames() {
+            const table = doc.getElementById('leaderboard-table');
+            if (table.hidden || typeof win.getComputedStyle !== 'function') return;
+            if (!leaderboardMeasure) leaderboardMeasure = doc.createElement('canvas').getContext?.('2d');
+            if (!leaderboardMeasure) return;
+            table.querySelectorAll('.leaderboard-label').forEach(label => {
+                const width = label.getBoundingClientRect().width;
+                if (width <= 0) return;
+                const style = win.getComputedStyle(label);
+                leaderboardMeasure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+                label.textContent = formatLeaderboardName(label.dataset.fullName, width - 0.5,
+                    text => leaderboardMeasure.measureText(text).width, win.Intl);
+            });
+        }
 
         function clearMessage(keepStorageWarning = false) {
             if (keepStorageWarning && preserveStorageWarning(toast.textContent, win.performance.now(), storageWarningUntil)) return;
@@ -602,6 +660,13 @@
             if (!state) return;
             const values = formatStatistics(state.stats);
             for (const [name, value] of Object.entries(values)) doc.querySelector(`[data-stat="${name}"]`).textContent = value;
+            const delta = formatScoreDelta(state.stats);
+            const deltaElement = doc.querySelector('[data-score-delta]');
+            deltaElement.textContent = delta;
+            deltaElement.hidden = !delta;
+            deltaElement.setAttribute('aria-label', delta ? `Изменение очков за последнюю игру: ${delta}` : '');
+            doc.querySelector('.stat-score-number').classList.toggle('stat-score-number--compact',
+                Boolean(delta) && values.score.length >= 4 && delta.length >= 4);
             const fragment = doc.createDocumentFragment();
             const maximum = Math.max(...state.stats.distribution, 1);
             state.stats.distribution.forEach((count, index) => {
@@ -643,9 +708,7 @@
                 const point = doc.createElement('span');
                 point.className = 'progress-point';
                 point.textContent = item.complete ? '✓' : String(item.number);
-                const word = doc.createElement('span');
-                word.className = 'progress-word';
-                word.textContent = formatProgressWord(item.word);
+                const word = createProgressWord(doc, item.word);
                 node.setAttribute('aria-label', item.complete ? `${item.number}: ${item.word}, отгадано` : `${item.number}: ещё не отгадано`);
                 node.append(point, word);
                 fragment.appendChild(node);
@@ -698,7 +761,7 @@
             const status = doc.getElementById('leaderboard-status');
             const table = doc.getElementById('leaderboard-table');
             if (!serverMode) {
-                status.textContent = 'Турнирная таблица доступна в Telegram.';
+                status.textContent = 'Топ участников доступен в Telegram.';
                 table.hidden = true;
                 return;
             }
@@ -729,7 +792,9 @@
                     rank.className = 'leaderboard-rank';
                     rank.textContent = String(item.rank);
                     const label = doc.createElement('span');
-                    label.textContent = item.name;
+                    label.className = 'leaderboard-label';
+                    label.dataset.fullName = item.name;
+                    label.textContent = formatLeaderboardName(item.name);
                     content.append(rank, label);
                     name.appendChild(content);
                     const played = doc.createElement('td');
@@ -741,8 +806,9 @@
                 });
                 doc.getElementById('leaderboard-rows').replaceChildren(fragment);
                 table.hidden = !rating.rows.length;
-                status.textContent = !rating.rows.length ? 'Пока нет участников с десятью завершёнными играми.'
-                    : !rating.self_eligible ? 'Для участия завершите 10 игр.' : '';
+                fitLeaderboardNames();
+                status.textContent = !rating.rows.length ? 'Пока нет участников с пятью завершёнными играми.'
+                    : !rating.self_eligible ? 'Для участия завершите 5 игр.' : '';
             } catch (error) { status.textContent = error.message; }
             finally { leaderboardBusy = false; }
         }
@@ -981,7 +1047,13 @@
                 if (!client.setDraft(draft)) refresh();
             }
         });
-        win.addEventListener('resize', () => { if (stickyWordError) positionWordError(); });
+        win.addEventListener('resize', () => {
+            if (stickyWordError) positionWordError();
+            fitLeaderboardNames();
+        });
+        if (typeof win.ResizeObserver === 'function') {
+            new win.ResizeObserver(fitLeaderboardNames).observe(doc.getElementById('leaderboard-table'));
+        }
         win.addEventListener('focus', () => { if (win.performance.now() - lastRefreshAt > 1000) refresh(); });
         doc.addEventListener('visibilitychange', () => {
             if (doc.visibilityState === 'visible') refresh();
@@ -1006,8 +1078,9 @@
         module.exports = {
             STORAGE_KEY, LocalApiError, initialScreen, normalizeDraft, parseSavedHistory,
             correctHints, draftCursor, editDraftCells, browserTimezone, validateLeaderboard,
+            LEADERBOARD_NAME_LIMIT, formatLeaderboardName,
             createHistoryStore, preserveStorageWarning, validateState, requestApi, createGameClient, formatStatistics,
-            gameIdentity, formatProgressWord, shouldCelebrate, formatCountdown, mount,
+            gameIdentity, formatProgressWord, createProgressWord, formatScoreDelta, shouldCelebrate, formatCountdown, mount,
         };
     }
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {

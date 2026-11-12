@@ -15,6 +15,7 @@ from typing import Any
 
 WORD_LENGTH = 5
 MAX_ATTEMPTS = 6
+MIN_RATED_GAMES = 5
 MAX_HISTORY_RECORDS = 5000
 # Совместимость с проверками и сохранениями первого локального этапа.
 MAX_HISTORY_DAYS = MAX_HISTORY_RECORDS
@@ -87,8 +88,8 @@ def calculate_score(
     max_streak: int,
     pool_size: int,
 ) -> int | None:
-    """Считает целые очки прогресса и качества после десяти партий."""
-    if played < 10:
+    """Считает целые очки прогресса и качества после пяти партий."""
+    if played < MIN_RATED_GAMES:
         return None
     if not wins or average is None:
         return 0
@@ -544,19 +545,33 @@ class LocalGameEngine:
         }
 
     def _statistics(self, games: list[dict[str, Any]], today: date) -> dict[str, Any]:
-        """Считает исходы и серии только завершённых партий."""
+        """Считает статистику и изменение очков за последнюю завершённую игру."""
         completed = [game for game in games if game["outcome"] is not None]
+        played = len(completed)
         distribution = [0] * MAX_ATTEMPTS
+        wins = 0
+        attempts = 0
         streak = 0
         maximum = 0
         strict = 0
         previous_day = None
-        for game in completed:
+        previous_score = None
+        for index, game in enumerate(completed):
+            if index == played - 1:
+                previous_score = calculate_score(
+                    index,
+                    wins,
+                    attempts / wins if wins else None,
+                    maximum,
+                    len(self._answers),
+                )
             day = _read_day(game["day"])
             if previous_day is not None and (day - previous_day).days > 1:
                 strict = 0
             if game["outcome"] == "win":
                 distribution[len(game["guesses"]) - 1] += 1
+                wins += 1
+                attempts += len(game["guesses"])
                 streak += 1
                 maximum = max(maximum, streak)
                 strict += 1
@@ -564,12 +579,17 @@ class LocalGameEngine:
                 streak = 0
                 strict = 0
             previous_day = day
-        wins = sum(distribution)
-        played = len(completed)
-        attempts = sum((index + 1) * count for index, count in enumerate(distribution))
         if previous_day is not None and (today - previous_day).days > 1:
             strict = 0
         average = attempts / wins if wins else None
+        score = calculate_score(played, wins, average, maximum, len(self._answers))
+        score_delta = (
+            score - previous_score
+            if score is not None and previous_score is not None
+            else None
+        )
+        if score_delta == 0:
+            score_delta = None
         return {
             "played": played,
             "wins": wins,
@@ -579,9 +599,8 @@ class LocalGameEngine:
             "average": average,
             "win_rate": wins / played * 100 if played else 0.0,
             "distribution": distribution,
-            "score": calculate_score(
-                played, wins, average, maximum, len(self._answers)
-            ),
+            "score": score,
+            "score_delta": score_delta,
             "score_version": SCORE_VERSION,
         }
 
