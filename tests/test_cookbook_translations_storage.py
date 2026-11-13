@@ -84,7 +84,7 @@ def test_hash_and_source_immutability() -> None:
         source.description = "Вода"
 
 
-@pytest.mark.parametrize("locale", ["ru", "ru-RU", "RU_ru", "en", "de", ""])
+@pytest.mark.parametrize("locale", ["ru", "ru-RU", "RU_ru", "en", "es", "uk", "de", ""])
 def test_missing_translation_falls_back_to_russian(
     tmp_path: Path,
     locale: str,
@@ -105,7 +105,7 @@ def test_missing_translation_falls_back_to_russian(
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("locale", ["en", "en-US", "de", "fr", ""])
+@pytest.mark.parametrize("locale", ["en", "en-US", "es", "es-MX", "uk", "uk-UA", "de", "fr", ""])
 def test_english_is_used_for_all_non_russian_locales(
     tmp_path: Path,
     locale: str,

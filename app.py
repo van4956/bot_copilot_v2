@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from common.comands import get_commands
+from common.locales import LANGUAGE_CODES
 from config_data.config import (
     ROOT,
     Config,
@@ -241,7 +242,7 @@ async def main(config: Config | None = None) -> None:
                 ):
                     raise RuntimeError("ID тестового бота не совпадает")
             await bot.delete_webhook(drop_pending_updates=config.drop_pending_updates)
-            for language_code in ("", "ru", "en"):
+            for language_code in ("", *LANGUAGE_CODES):
                 await bot.set_my_commands(
                     get_commands(language_code or "ru"),
                     scope=types.BotCommandScopeAllPrivateChats(),
@@ -263,7 +264,7 @@ async def main(config: Config | None = None) -> None:
                     close_bot_session=False,
                 )
             finally:
-                await notify_service(bot, config, "Бот остановлен")
+                await notify_service(bot, config, "☠️ Бот остановлен")
     finally:
         try:
             if dp is not None:

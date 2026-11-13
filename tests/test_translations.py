@@ -1,4 +1,4 @@
-"""Проверки полных каталогов RU/EN без сети и секретных настроек."""
+"""Проверки четырёх полных каталогов без сети и секретных настроек."""
 
 import gettext
 import re
@@ -65,7 +65,7 @@ class _Markup(HTMLParser):
         assert self.stack and self.stack.pop() == tag
 
 
-@pytest.mark.parametrize("language", ["ru", "en"])
+@pytest.mark.parametrize("language", ["ru", "en", "es", "uk"])
 def test_active_catalog_is_complete_and_compiled(language: str) -> None:
     """Все активные сообщения переведены и совпадают с бинарным каталогом."""
     catalog = _catalog(language)
@@ -126,7 +126,7 @@ def test_template_matches_only_current_ui_sources() -> None:
             )
 
 
-@pytest.mark.parametrize("language", ["ru", "en"])
+@pytest.mark.parametrize("language", ["ru", "en", "es", "uk"])
 def test_game_invitation_and_reminder_notice_have_compiled_translations(
     language: str,
 ) -> None:
@@ -134,14 +134,24 @@ def test_game_invitation_and_reminder_notice_have_compiled_translations(
     translator = _translator(language)
     notice = "Из-за особенностей механики игры игра пока доступна только на русском языке"
     reminder = "Пора сыграть в 5БУКВ! Сегодня вас ждёт новое слово."
-    assert translator.gettext(notice) == (
-        notice if language == "ru"
-        else "Due to the game's mechanics, it is currently available only in Russian"
-    )
-    assert translator.gettext(reminder) == (
-        reminder if language == "ru"
-        else "Time to play 5БУКВ! A new word is waiting for you today."
-    )
+    translated_notice = translator.gettext(notice)
+    assert translated_notice == {
+        "ru": notice,
+        "en": "Due to the game's mechanics, it is currently available only in Russian",
+        "es": "Por las características de su mecánica, el juego está disponible por ahora solo en ruso",
+        "uk": "Через особливості механіки гра наразі доступна лише російською",
+    }[language]
+    assert not translated_notice.endswith((".", "!", "?"))
+    assert not translated_notice.startswith("(")
+    translated_reminder = translator.gettext(reminder)
+    assert "5БУКВ" in translated_reminder
+    if language == "ru":
+        assert translated_reminder == reminder
+    elif language == "en":
+        assert translated_reminder == "Time to play 5БУКВ! A new word is waiting for you today."
+    else:
+        assert translated_reminder != reminder
+        assert translated_reminder != _translator("en").gettext(reminder)
 
 
 def test_russian_catalog_keeps_new_messages_in_russian() -> None:
@@ -290,7 +300,7 @@ def test_compiled_catalog_formats_game_score() -> None:
     )
 
 
-@pytest.mark.parametrize("language", ["ru", "en"])
+@pytest.mark.parametrize("language", ["ru", "en", "es", "uk"])
 def test_translated_markup_is_balanced(language: str) -> None:
     """Перевод не ломает и не добавляет HTML-теги."""
     for message in _catalog(language):
@@ -319,7 +329,6 @@ def test_actual_keyboard_uses_compiled_english_catalog() -> None:
     ("Игры 🕹", "Games 🕹"),
     ("◀️ Удалить", "◀️ Delete"),
     ("Ввод ▶️", "Enter ▶️"),
-    ("Автор:", "Author:"),
     ("Кулинарная книга", "Cookbook"),
     ("Настройки", "Settings"),
     ("Выбран: 🇺🇸 Английский", "Selected: 🇺🇸 English"),
@@ -333,9 +342,27 @@ def test_shared_ui_labels_have_compiled_english(
     assert _translator("en").gettext(original) == expected
 
 
+@pytest.mark.parametrize("language,previous", [
+    ("ru", "Автор:"), ("en", "Author:"), ("es", "Autor:"), ("uk", "Автор:"),
+])
+def test_removed_recipe_author_label_is_only_obsolete(
+    language: str, previous: str,
+) -> None:
+    """Убрана только подпись шаблона, а прежние переводы остаются в архиве."""
+    catalog = _catalog(language)
+    with (ROOT / "locales" / "messages.pot").open("rb") as stream:
+        template = read_po(stream)
+    assert catalog.get("Автор:") is None
+    assert template.get("Автор:") is None
+    assert catalog.obsolete["Автор:"].string == previous
+    assert _translator(language).gettext("Автор:") == "Автор:"
+
+
 @pytest.mark.parametrize("language,game,delete,enter", [
     ("ru", "Игры 🕹", "◀️ Удалить", "Ввод ▶️"),
     ("en", "Games 🕹", "◀️ Delete", "Enter ▶️"),
+    ("es", "Juegos 🕹", "◀️ Borrar", "Introducir ▶️"),
+    ("uk", "Ігри 🕹", "◀️ Видалити", "Ввід ▶️"),
 ])
 def test_shared_keyboards_use_current_catalog(
     language: str, game: str, delete: str, enter: str,
@@ -359,6 +386,8 @@ def test_shared_keyboards_use_current_catalog(
 @pytest.mark.parametrize("language,descriptions", [
     ("ru", ["Главная панель", "Кулинарная книга", "Настройки"]),
     ("en", ["Main panel", "Cookbook", "Settings"]),
+    ("es", ["Panel principal", "Recetario", "Ajustes"]),
+    ("uk", ["Головна панель", "Кулінарна книга", "Налаштування"]),
 ])
 def test_command_descriptions_use_explicit_locale(
     language: str, descriptions: list[str],
@@ -374,6 +403,8 @@ def test_command_descriptions_use_explicit_locale(
 @pytest.mark.parametrize("language,heading,memory,uptime", [
     ("ru", "Состояние бота", "Память: 128.0 МБ", "Время работы:"),
     ("en", "Bot status", "RAM: 128.0 MB", "Uptime:"),
+    ("es", "Estado del bot", "Memoria: 128.0 MB", "Tiempo de actividad:"),
+    ("uk", "Стан бота", "Пам’ять: 128.0 МБ", "Час роботи:"),
 ])
 async def test_status_uses_current_compiled_catalog(
     monkeypatch: pytest.MonkeyPatch,
@@ -399,9 +430,10 @@ async def test_status_uses_current_compiled_catalog(
     assert "Status of Bot" not in text
 
 
-def test_english_catalog_has_no_untranslated_russian_ui() -> None:
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_latin_catalog_has_no_untranslated_russian_ui(language: str) -> None:
     """Русские буквы допустимы только в неизменяемых именах игры и модели."""
-    for message in _catalog("en"):
+    for message in _catalog(language):
         if not message.id or not isinstance(message.string, str):
             continue
         text = (

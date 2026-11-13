@@ -7,9 +7,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.locales import SUPPORTED_LOCALES, normalize_locale
 from database.models import Users
-
-SUPPORTED_LOCALES = {"ru", "en"}
 
 
 async def orm_get_ids(session: AsyncSession) -> list[int]:
@@ -25,8 +24,7 @@ async def orm_add_user(
         "user_id": data["user_id"],
         "user_name": str(data.get("user_name") or "")[:150],
         "full_name": str(data.get("full_name") or "Пользователь")[:150],
-        "locale": data.get("locale")
-        if data.get("locale") in SUPPORTED_LOCALES else "ru",
+        "locale": normalize_locale(data.get("locale")),
         "status": data.get("status", "member"),
         "flag": data.get("flag", 1),
     }
@@ -91,7 +89,7 @@ async def orm_get_locale(
     )
     if value is None:
         return None
-    return value if value in SUPPORTED_LOCALES else "ru"
+    return normalize_locale(value)
 
 
 async def orm_update_status(
@@ -108,7 +106,7 @@ async def orm_update_locale(
 ) -> None:
     """Сохраняет выбранный поддерживаемый язык."""
     if data not in SUPPORTED_LOCALES:
-        raise ValueError("Поддерживаются только русский и английский языки")
+        raise ValueError("Язык не поддерживается")
     query = update(Users).where(Users.user_id == user_id).values(locale=data)
     await session.execute(query)
     await session.commit()

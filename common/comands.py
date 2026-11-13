@@ -9,6 +9,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BotCommand, BotCommandScopeChat
 
+from common.locales import SUPPORTED_LOCALES
 from config_data.config import ROOT
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def get_commands(locale: str = "ru") -> list[BotCommand]:
     """Читает подписи команд из собранного каталога выбранного языка."""
-    if locale not in {"ru", "en"}:
+    if locale not in SUPPORTED_LOCALES:
         raise ValueError("Неподдерживаемый язык меню команд")
     catalog = gettext.translation(
         "bot_00_template", localedir=ROOT / "locales", languages=[locale]

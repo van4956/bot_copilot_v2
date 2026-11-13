@@ -9,7 +9,9 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from aiogram.types import (
+    CallbackQuery, Message, MessageEntity, ReplyKeyboardMarkup, ReplyKeyboardRemove,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -165,16 +167,18 @@ def _split_plain_line(line: str, limit: int) -> list[str]:
     return result or [""]
 
 
-def split_user_messages(
+def _user_summary_messages(
     users: Iterable[Any], limit: int = 4000, *, admin_ids: Iterable[int] = (),
-) -> list[str]:
-    """Разбивает полный список пользователей без потери строк и HTML-ошибок."""
+) -> list[tuple[str, list[MessageEntity]]]:
+    """Разбивает сводку и сохраняет разметку отдельных участков строк."""
     if limit < 2:
         raise ValueError("Слишком короткий лимит сообщения")
     users = list(users)
     id_width = max((len(str(user.user_id)) for user in users), default=1)
     active_admins = set(admin_ids)
-    lines = ["Информация зарегистрированных пользователей:", ""]
+    lines: list[tuple[str, list[MessageEntity]]] = [
+        ("Информация зарегистрированных пользователей:", []), ("", []),
+    ]
     for user in users:
         status = (
             "a" if user.user_id in active_admins
@@ -182,30 +186,67 @@ def split_user_messages(
         )
         identifier = str(user.user_id).zfill(id_width)
         username = user.user_name or "без username"
-        lines.append(
-            f"{identifier} | {status} - {user.locale} | @{username}"
-        )
+        prefix = f"{identifier} | "
+        middle = f"{status} - {user.locale}"
+        before_username = f"{prefix}{middle} | "
+        entities = [MessageEntity(
+            type="code", offset=len(prefix.encode("utf-16-le")) // 2,
+            length=len(middle.encode("utf-16-le")) // 2,
+        )]
+        if (
+            5 <= len(username) <= 32 and username.isascii()
+            and username[0].isalpha() and username.replace("_", "").isalnum()
+        ):
+            entities.append(MessageEntity(
+                type="mention", offset=len(before_username.encode("utf-16-le")) // 2,
+                length=len(username) + 1,
+            ))
+        lines.append((f"{before_username}@{username}", entities))
     if users:
-        lines.append("")
-    lines.append("Всего {count} пользователей".format(count=len(users)))
+        lines.append(("", []))
+    lines.append(("Всего {count} пользователей".format(count=len(users)), []))
     messages = []
     current = []
+    current_entities = []
     size = 0
-    for line in lines:
+    for line, entities in lines:
+        line_offset = 0
         for part in _split_plain_line(line, limit):
             width = len(part.encode("utf-16-le")) // 2
             separator = int(bool(current))
             if size + separator + width > limit:
                 if any(current):
-                    messages.append("\n".join(current))
+                    messages.append(("\n".join(current), current_entities))
                 current = []
+                current_entities = []
                 size = 0
                 separator = 0
+            for entity in entities:
+                start = max(entity.offset, line_offset)
+                end = min(entity.offset + entity.length, line_offset + width)
+                if start >= end:
+                    continue
+                if entity.type == "mention" and end - start != entity.length:
+                    continue
+                current_entities.append(entity.model_copy(update={
+                    "offset": size + separator + start - line_offset,
+                    "length": end - start,
+                }))
             current.append(part)
             size += separator + width
+            line_offset += width
     if any(current):
-        messages.append("\n".join(current))
+        messages.append(("\n".join(current), current_entities))
     return messages
+
+
+def split_user_messages(
+    users: Iterable[Any], limit: int = 4000, *, admin_ids: Iterable[int] = (),
+) -> list[str]:
+    """Разбивает полный список пользователей без изменения обычного текста."""
+    return [
+        text for text, _ in _user_summary_messages(users, limit, admin_ids=admin_ids)
+    ]
 
 
 @admin_router.message(
@@ -219,10 +260,10 @@ async def get_users_info(
     """Отправляет полный список пользователей частями."""
     active_bot = getattr(message, "bot", None)
     admin_ids = getattr(active_bot, "admin_list", ()) or ()
-    for text in split_user_messages(
+    for text, entities in _user_summary_messages(
         await orm_get_users(session), admin_ids=admin_ids,
     ):
-        await message.answer(text, parse_mode=None)
+        await message.answer(text, parse_mode=None, entities=entities)
 
 
 @admin_router.message(F.text.in_({ASSORTMENT_BUTTON, "Ассортимент Книги"}))
@@ -239,7 +280,7 @@ async def assortment_cookbook(
                     recipe.image,
                     test_mode=getattr(message.bot, "test_mode", False),
                 ),
-                caption=format_recipe_caption(recipe, author_label="Автор:"),
+                caption=format_recipe_caption(recipe),
                 reply_markup=get_callback_btns(btns={
                     "Удалить": f"{DELETE_PREFIX}{recipe.recipe_id}",
                     "Изменить": f"{CHANGE_PREFIX}{recipe.recipe_id}",

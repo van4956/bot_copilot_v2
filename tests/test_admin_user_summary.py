@@ -4,11 +4,19 @@ from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from aiogram.types import MessageEntity
 import pytest
 
 from handlers import admin
 
 TITLE = "Информация зарегистрированных пользователей:"
+
+
+def _entity_text(text: str, entity: MessageEntity) -> str:
+    """Читает участок сообщения по смещению Telegram в UTF-16."""
+    return text.encode("utf-16-le")[
+        entity.offset * 2:(entity.offset + entity.length) * 2
+    ].decode("utf-16-le")
 
 
 def _user(
@@ -157,11 +165,17 @@ async def test_handler_uses_active_bot_admins_and_plain_text(
     await admin.get_users_info(message, session)
 
     get_users.assert_awaited_once_with(session)
-    message.answer.assert_awaited_once_with(
+    message.answer.assert_awaited_once()
+    call = message.answer.await_args
+    assert call.args == (
         f"{TITLE}\n\n1 | m - en | @van4956\n"
         "2 | a - ru | @<owner>&\n\nВсего 2 пользователей",
-        parse_mode=None,
     )
+    assert call.kwargs["parse_mode"] is None
+    assert [
+        (entity.type, _entity_text(call.args[0], entity))
+        for entity in call.kwargs["entities"]
+    ] == [("code", "m - en"), ("mention", "@van4956"), ("code", "a - ru")]
 
 
 async def test_handler_without_admin_config_does_not_guess_owner(
@@ -175,3 +189,122 @@ async def test_handler_without_admin_config_does_not_guess_owner(
 
     assert "1 | m - en | @van4956" in message.answer.await_args.args[0]
     assert " | a - " not in message.answer.await_args.args[0]
+
+
+def test_monospace_covers_only_status_and_locale() -> None:
+    """Моноширинными становятся только статус и локаль, а username остаётся ссылкой."""
+    users = [
+        _user(1, "first_user"),
+        _user(22, "second_user", status="kicked", locale="ru"),
+        _user(333, "admin_user", locale="ru"),
+    ]
+    messages = admin._user_summary_messages(users, admin_ids=[333])
+
+    assert [text for text, _ in messages] == admin.split_user_messages(
+        users, admin_ids=[333],
+    )
+    text, entities = messages[0]
+    assert [_entity_text(text, item) for item in entities if item.type == "code"] == [
+        "m - en", "k - ru", "a - ru",
+    ]
+    assert [_entity_text(text, item) for item in entities if item.type == "mention"] == [
+        "@first_user", "@second_user", "@admin_user",
+    ]
+    assert "001 | m - en | @first_user" in text
+    assert all(item.type in {"code", "mention"} for item in entities)
+
+
+def test_offsets_count_emoji_as_two_utf16_units() -> None:
+    """Эмодзи предыдущей строки не смещают разметку следующего пользователя."""
+    users = [_user(1, "😀👨‍👩‍👦<tag>&"), _user(2, "normal_user", status="guest", locale="ru")]
+    text, entities = admin._user_summary_messages(users)[0]
+    code = [item for item in entities if item.type == "code"]
+    expected_offset = len(text[:text.index("k - ru")].encode("utf-16-le")) // 2
+
+    assert code[1].offset == expected_offset
+    assert code[1].offset > text.index("k - ru")
+    assert [_entity_text(text, item) for item in code] == ["m - en", "k - ru"]
+    assert [_entity_text(text, item) for item in entities if item.type == "mention"] == [
+        "@normal_user",
+    ]
+
+
+def test_default_limit_keeps_entities_in_each_of_many_messages() -> None:
+    """Большая сводка сохраняет текст и локальные смещения в каждом сообщении."""
+    users = [_user(1, "😀" * 5001 + "<literal>&")]
+    users.extend(_user(index, f"person_{index}") for index in range(2, 502))
+    messages = admin._user_summary_messages(users, admin_ids=[501])
+
+    assert len(messages) >= 3
+    assert [text for text, _ in messages] == admin.split_user_messages(
+        users, admin_ids=[501],
+    )
+    code_contents = []
+    mention_contents = []
+    for text, entities in messages:
+        units = len(text.encode("utf-16-le")) // 2
+        assert 0 < units <= 4000
+        for entity in entities:
+            assert 0 <= entity.offset < units
+            assert 0 < entity.length <= units - entity.offset
+            content = _entity_text(text, entity)
+            if entity.type == "code":
+                code_contents.append(content)
+            else:
+                assert entity.type == "mention"
+                mention_contents.append(content)
+    assert code_contents == ["m - en"] * 500 + ["a - en"]
+    assert mention_contents == [f"@person_{index}" for index in range(2, 502)]
+
+
+@pytest.mark.parametrize("limit", [2, 3, 6, 17, 40, 4000])
+def test_code_entities_remain_valid_when_a_line_is_split(limit: int) -> None:
+    """Разбиение строки сохраняет текст и безопасно разделяет моноширинный участок."""
+    users = [_user(123, "normal_user", locale="ru")]
+    messages = admin._user_summary_messages(users, limit=limit)
+
+    assert [text for text, _ in messages] == admin.split_user_messages(users, limit=limit)
+    code_contents = []
+    for text, entities in messages:
+        units = len(text.encode("utf-16-le")) // 2
+        assert units <= limit
+        for entity in entities:
+            assert entity.offset >= 0 and entity.length > 0
+            assert entity.offset + entity.length <= units
+            if entity.type == "code":
+                code_contents.append(_entity_text(text, entity))
+            else:
+                assert _entity_text(text, entity) == "@normal_user"
+    assert "".join(code_contents) == "m - ru"
+
+
+def test_username_cannot_inject_monospace_or_html() -> None:
+    """Похожая строка внутри имени не получает разметку строки пользователя."""
+    username = "<code>fake</code>\n123 | k - ru | @fake_name `test`"
+    text, entities = admin._user_summary_messages([_user(1, username)])[0]
+
+    assert f"@{username}" in text
+    assert [(item.type, _entity_text(text, item)) for item in entities] == [
+        ("code", "m - en"),
+    ]
+
+
+@pytest.mark.parametrize("username", [None, "", "ab", "invalid name", "@double", "<tag>"])
+def test_invalid_or_missing_username_is_not_a_mention(username: str | None) -> None:
+    """Пустые и невалидные username остаются прежним обычным текстом."""
+    text, entities = admin._user_summary_messages([_user(1, username)])[0]
+
+    assert text == admin.split_user_messages([_user(1, username)])[0]
+    assert [item.type for item in entities] == ["code"]
+
+
+async def test_empty_summary_has_no_entities(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Пустая сводка не создаёт лишнюю разметку или дополнительные сообщения."""
+    monkeypatch.setattr(admin, "orm_get_users", AsyncMock(return_value=[]))
+    message = SimpleNamespace(answer=AsyncMock())
+
+    await admin.get_users_info(message, object())
+
+    message.answer.assert_awaited_once_with(
+        f"{TITLE}\n\nВсего 0 пользователей", parse_mode=None, entities=[],
+    )

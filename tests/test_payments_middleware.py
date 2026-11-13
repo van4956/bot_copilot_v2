@@ -189,7 +189,7 @@ async def test_unsupported_cached_locale_reloaded(
     monkeypatch: pytest.MonkeyPatch, state: FSMContext
 ) -> None:
     """Старый неподдерживаемый язык в FSM заменяется допустимым."""
-    await state.update_data(locale="uk")
+    await state.update_data(locale="fr")
     monkeypatch.setattr(locale, "orm_get_locale", AsyncMock(return_value="en"))
     event = Update(update_id=1, message=make_message(text="hello"))
     await locale.LocaleFromDBMiddleware({})(

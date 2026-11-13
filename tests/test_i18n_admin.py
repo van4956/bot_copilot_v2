@@ -119,7 +119,7 @@ async def test_keyboard_and_steps_stay_russian_for_each_public_locale(i18n: I18n
                 assert i18n.current_locale == locale
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 async def test_add_recipe_keeps_russian_steps_and_original_content(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
@@ -151,7 +151,7 @@ async def test_add_recipe_keeps_russian_steps_and_original_content(
     assert await state.get_state() is None
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 async def test_edit_and_delete_callbacks_keep_identifiers(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
@@ -180,7 +180,7 @@ async def test_edit_and_delete_callbacks_keep_identifiers(
     delete.assert_awaited_once_with(session, 7)
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 async def test_permission_denial_and_old_buttons_stay_russian(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
@@ -201,7 +201,7 @@ async def test_permission_denial_and_old_buttons_stay_russian(
     forbidden.assert_not_awaited()
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 async def test_validation_and_save_error_stay_russian(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
@@ -227,7 +227,7 @@ async def test_validation_and_save_error_stay_russian(
     assert await state.get_state() is None
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 async def test_recipe_list_fallback_and_user_information_stay_russian(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str
 ) -> None:
@@ -240,7 +240,8 @@ async def test_recipe_list_fallback_and_user_information_stay_russian(
     with i18n.context(), i18n.use_locale(locale):
         message = _message()
         await admin.assortment_cookbook(message, object())
-        assert "Автор:" in message.answer_photo.await_args.kwargs["caption"]
+        assert "Автор:" not in message.answer_photo.await_args.kwargs["caption"]
+        assert "<i>&lt;Автор&gt;</i>\n\n" in message.answer_photo.await_args.kwargs["caption"]
         assert "&lt;Автор&gt;" in message.answer_photo.await_args.kwargs["caption"]
         buttons = message.answer_photo.await_args.kwargs["reply_markup"].inline_keyboard
         assert [button.text for row in buttons for button in row] == [
@@ -263,7 +264,7 @@ async def test_recipe_list_fallback_and_user_information_stay_russian(
         assert message.answer.await_args.kwargs["parse_mode"] is None
 
 
-@pytest.mark.parametrize("locale", ["ru", "en"])
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk"])
 @pytest.mark.parametrize("legacy", [False, True])
 async def test_real_admin_router_accepts_russian_buttons_and_editor_controls(
     i18n: I18n, monkeypatch: pytest.MonkeyPatch, locale: str, legacy: bool,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gettext
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -45,11 +46,92 @@ from prototypes.wordli.reminders import (
     TelegramReminderSender,
     reminder_service,
 )
+from config_data.config import ROOT
 
 NOW = datetime(2026, 11, 8, 2, 0, tzinfo=timezone.utc)
 TOKEN = "123456:SYNTHETIC_REMINDER_TOKEN"
 USER_ID = 900001
 ORIGIN = "https://wordli-reminders.example"
+
+
+@pytest.mark.parametrize("locale", ["ru", "en", "es", "uk", "es-MX", "uk-UA"])
+async def test_reminder_uses_all_four_compiled_catalogs(locale: str) -> None:
+    """Поддерживаемые языки не заменяются английским и не меняют кнопки игры."""
+    base = locale.split("-")[0]
+    translate = gettext.translation(
+        "bot_00_template", localedir=ROOT / "locales", languages=[base]
+    ).gettext
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    sender = TelegramReminderSender(
+        session, TOKEN, ORIGIN, locale_reader=AsyncMock(return_value=locale)
+    )
+    assert await sender.send(USER_ID) == ReminderResult("sent")
+    payload = session.post.call_args.kwargs["json"]
+    expected = translate(REMINDER_TEXT)
+    if base != "ru":
+        expected += f"\n\n({translate(GAME_LANGUAGE_NOTICE)})"
+    assert payload["text"] == expected
+    assert payload["reply_markup"]["inline_keyboard"] == [
+        [{"text": "5БУКВ", "web_app": {"url": ORIGIN}}],
+        [{"text": translate("Назад на главную ↩️"), "callback_data": "wordli_back_to_main"}],
+    ]
+    if base in {"es", "uk"}:
+        english = gettext.translation(
+            "bot_00_template", localedir=ROOT / "locales", languages=["en"]
+        ).gettext
+        assert not payload["text"].startswith(english(REMINDER_TEXT))
+
+
+async def test_four_reminder_languages_are_independent_when_sent_together() -> None:
+    """Параллельные сообщения не разделяют локаль, словарь кнопок или их разметку."""
+    languages = dict(zip(range(USER_ID, USER_ID + 4), ("ru", "en", "es", "uk")))
+
+    async def locale_reader(user_id: int) -> str:
+        """Имитирует параллельное чтение языка из базы."""
+        await asyncio.sleep(0)
+        return languages[user_id]
+
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    sender = TelegramReminderSender(session, TOKEN, ORIGIN, locale_reader=locale_reader)
+    assert await asyncio.gather(*(sender.send(user_id) for user_id in languages)) == [
+        ReminderResult("sent") for _ in languages
+    ]
+    payloads = [call.kwargs["json"] for call in session.post.call_args_list]
+    assert len({id(item["reply_markup"]) for item in payloads}) == 4
+    assert len({id(item["reply_markup"]["inline_keyboard"]) for item in payloads}) == 4
+    for payload in payloads:
+        locale = languages[payload["chat_id"]]
+        translate = gettext.translation(
+            "bot_00_template", localedir=ROOT / "locales", languages=[locale]
+        ).gettext
+        assert payload["text"].startswith(translate(REMINDER_TEXT))
+        assert payload["reply_markup"]["inline_keyboard"][1][0]["text"] == translate(
+            "Назад на главную ↩️"
+        )
+
+
+async def test_four_language_changes_do_not_reset_game_or_reminder_settings(
+    reminder_backend,
+) -> None:
+    """Новый язык читается перед отправкой без изменения игры и расписания."""
+    backend, database, _, _ = reminder_backend
+    users = await _locale_users(database, [{"user_id": USER_ID, "locale": "ru"}])
+    await backend.settings(USER_ID, reminder_enabled=True)
+    await backend.bootstrap(USER_ID)
+    game_before = await profile_data(database)
+    settings_before = await reminder_data(database)
+    session = SimpleNamespace(post=Mock(return_value=Response(200, {"ok": True})))
+    sender = TelegramReminderSender(session, TOKEN, ORIGIN, locale_reader=backend.user_locale)
+    for locale in ("es", "uk", "en", "ru"):
+        async with database.begin() as connection:
+            await connection.execute(update(users).values(locale=locale))
+        assert await sender.send(USER_ID) == ReminderResult("sent")
+        translate = gettext.translation(
+            "bot_00_template", localedir=ROOT / "locales", languages=[locale]
+        ).gettext
+        assert session.post.call_args.kwargs["json"]["text"].startswith(translate(REMINDER_TEXT))
+        assert await profile_data(database) == game_before
+        assert await reminder_data(database) == settings_before
 
 
 class Response:

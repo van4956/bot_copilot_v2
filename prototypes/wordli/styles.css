@@ -464,7 +464,7 @@ button:focus-visible {
 .leaderboard-table th { padding: 0 8px 14px; color: var(--muted); font-weight: 400; text-align: left; }
 .leaderboard-table th:nth-child(2), .leaderboard-table td:nth-child(2) { width: 62px; text-align: right; }
 .leaderboard-table th:nth-child(3), .leaderboard-table td:nth-child(3) { width: 66px; text-align: right; }
-.leaderboard-table td { padding: 14px 8px; border-top: 1px solid #ffffff0c; font-variant-numeric: tabular-nums; vertical-align: middle; }
+.leaderboard-table td { padding: 14px 8px; border-top: 0; font-variant-numeric: tabular-nums; vertical-align: middle; }
 .leaderboard-table tbody > tr:first-child td, .leaderboard-separator + tr td { border-top: 0; }
 .leaderboard-name { display: flex; align-items: baseline; gap: 10px; }
 .leaderboard-label { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; }

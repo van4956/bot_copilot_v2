@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
 from common.comands import sync_user_commands
+from common.locales import SUPPORTED_LOCALES
 from database.orm_users import orm_update_locale
 
 logger = logging.getLogger(__name__)
@@ -87,13 +88,17 @@ def get_keyboard() -> InlineKeyboardMarkup:
     """Создаёт выбор поддерживаемых языков."""
     button_1 = InlineKeyboardButton(text=_("🇺🇸 Английский"), callback_data="locale_en")
     button_2 = InlineKeyboardButton(text=_("🇷🇺 Русский"), callback_data="locale_ru")
+    button_3 = InlineKeyboardButton(text=_("🇪🇸 Испанский"), callback_data="locale_es")
+    button_4 = InlineKeyboardButton(text=_("🇺🇦 Украинский"), callback_data="locale_uk")
     button_6 = InlineKeyboardButton(text=_("Назад"), callback_data="back_to_info")
     button_7 = InlineKeyboardButton(
         text=_("Назад на главную ↩️"), callback_data="about_back_to_main"
     )  # обработчик этой кнопки в private.py
 
     return InlineKeyboardMarkup(
-        inline_keyboard=[[button_1, button_2], [button_6], [button_7]]
+        inline_keyboard=[
+            [button_1, button_2], [button_3, button_4], [button_6], [button_7],
+        ]
     )
 
 
@@ -122,19 +127,20 @@ async def update_locale_cmd(
     i18n_middleware: FSMI18nMiddleware,
 ) -> None:
     """Сохраняет язык и сразу обновляет переводы и общую главную панель."""
-    target = {"locale_en": "en", "locale_ru": "ru"}.get(callback.data)
+    target = {f"locale_{code}": code for code in SUPPORTED_LOCALES}.get(callback.data)
     if target is None:
         await callback.answer(_("Язык не поддерживается."), show_alert=True)
         return
     await orm_update_locale(session, callback.from_user.id, target)
     await i18n_middleware.set_locale(state, target)
     await callback.message.delete()
-    if target == "en":
-        popup = _("Выбран: 🇺🇸 Английский")
-        header = _("Текущий язык \n\n 🇺🇸 Английский")
-    else:
-        popup = _("Выбран: 🇷🇺 Русский язык")
-        header = _("Текущий язык \n\n 🇷🇺 Русский")
+    confirmations = {
+        "en": (_("Выбран: 🇺🇸 Английский"), _("Текущий язык \n\n 🇺🇸 Английский")),
+        "ru": (_("Выбран: 🇷🇺 Русский язык"), _("Текущий язык \n\n 🇷🇺 Русский")),
+        "es": (_("Выбран: 🇪🇸 Испанский"), _("Текущий язык \n\n 🇪🇸 Испанский")),
+        "uk": (_("Выбран: 🇺🇦 Украинский"), _("Текущий язык \n\n 🇺🇦 Украинский")),
+    }
+    popup, header = confirmations[target]
     await callback.answer(popup)
     await callback.message.answer(
         header, reply_markup=keyboard.start_keyboard(bot=callback.bot)

@@ -125,7 +125,7 @@ async def test_concurrent_registration_one_user(db: AsyncSession) -> None:
 async def test_unknown_locale_and_long_name(db: AsyncSession) -> None:
     """Неподдерживаемый язык и длинное имя безопасно нормализуются."""
     user, _ = await orm_users.orm_add_user(
-        db, make_user_data(locale="uk", user_name=None, full_name="x" * 256)
+        db, make_user_data(locale="fr", user_name=None, full_name="x" * 256)
     )
     assert user.locale == "ru"
     assert user.user_name == ""
@@ -189,7 +189,7 @@ async def test_start_resets_state_preserves_locale(
 async def test_names_escaped_in_html(
     db: AsyncSession, state: FSMContext
 ) -> None:
-    """Произвольное имя не становится HTML-разметкой в сообщениях."""
+    """Приветствие экранирует имя, а служебный отчёт без username использует ID."""
     bot = SimpleNamespace(
         test_mode=False, home_group=[999], notify_service_chat=True,
         send_message=AsyncMock(),
@@ -199,7 +199,7 @@ async def test_names_escaped_in_html(
     caption = message.answer_photo.await_args.kwargs["caption"]
     service_text = bot.send_message.await_args.kwargs["text"]
     assert "&lt;Test &amp; User&gt;" in caption
-    assert "&lt;Test &amp; User&gt;" in service_text
+    assert service_text == f"✅ {USER_ID} - подписался на бота"
 
 
 @pytest.mark.asyncio

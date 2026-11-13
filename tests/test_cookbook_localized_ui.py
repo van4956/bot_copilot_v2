@@ -93,7 +93,10 @@ async def publish_english(session: AsyncSession) -> None:
 
 
 @pytest.mark.parametrize(
-    "locale,translated", [("ru", True), ("en", True), ("en", False), ("de", True)]
+    "locale,translated", [
+        ("ru", True), ("en", True), ("en", False), ("de", True),
+        ("es", True), ("uk", True), ("es", False), ("uk", False),
+    ]
 )
 async def test_open_book_selects_content_language_and_preserves_locale(
     session: AsyncSession,
@@ -178,6 +181,8 @@ async def test_page_refresh_detects_locale_author_photo_and_total_changes(
     [
         ("ru", "В книге пока нет рецептов."),
         ("en", "There are no recipes in the cookbook yet."),
+        ("es", "Todavía no hay recetas en el recetario."),
+        ("uk", "У книзі поки немає рецептів."),
     ],
 )
 async def test_empty_book_is_localized_on_open_and_old_button(

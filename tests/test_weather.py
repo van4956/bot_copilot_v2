@@ -393,7 +393,7 @@ async def test_invalid_numeric_payload_returns_safe_error(
     assert result == "Сервис погоды вернул некорректный ответ"
 
 
-@pytest.mark.parametrize("language", ["ru", "en"])
+@pytest.mark.parametrize("language", ["ru", "en", "es", "uk"])
 @pytest.mark.parametrize("method", ["city", "location"])
 @pytest.mark.parametrize("api_error", [False, True])
 async def test_real_router_three_days_returns_main_on_success_and_api_error(

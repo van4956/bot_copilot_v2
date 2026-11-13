@@ -391,7 +391,7 @@
 
     /** Форматирует только показатели, вычисленные Python-сервером. */
     function formatStatistics(stats) {
-        const decimal = new Intl.NumberFormat('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const decimal = new Intl.NumberFormat('ru-RU', {minimumFractionDigits: 1, maximumFractionDigits: 1});
         return {
             played: String(stats.played), 'win-rate': stats.played ? `${decimal.format(stats.win_rate)}%` : '0%',
             'win-streak': String(stats.win_streak), score: stats.score == null ? '—' : String(stats.score),

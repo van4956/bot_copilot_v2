@@ -323,8 +323,28 @@ test('статистика форматирует серверные значе�
     const stats = stateFor().stats;
     assert.deepEqual(ui.formatStatistics(stats), {played: '0', 'win-rate': '0%', score: '—', 'win-streak': '0', average: '—', 'max-streak': '0'});
     assert.deepEqual(ui.formatStatistics({...stats, played: 2, wins: 1, win_rate: 50, average: 4, strict_streak: 1, win_streak: 1, max_streak: 1}), {
-        played: '2', 'win-rate': '50,00%', score: '—', 'win-streak': '1', average: '4,00', 'max-streak': '1',
+        played: '2', 'win-rate': '50,0%', score: '—', 'win-streak': '1', average: '4,0', 'max-streak': '1',
     });
+});
+
+test('доля побед и средние попытки округляются до одного знака только при отображении', () => {
+    const samples = [
+        {win_rate: 94.29, average: 4.06, shownRate: '94,3%', shownAverage: '4,1'},
+        {win_rate: 100, average: 1, shownRate: '100,0%', shownAverage: '1,0'},
+        {win_rate: 0, average: null, shownRate: '0,0%', shownAverage: '—'},
+        {win_rate: 99.95, average: 1.25, shownRate: '100,0%', shownAverage: '1,3'},
+        {win_rate: 42.04, average: 4.04, shownRate: '42,0%', shownAverage: '4,0'},
+        {win_rate: 50, average: 6, shownRate: '50,0%', shownAverage: '6,0'},
+    ];
+    for (const {win_rate, average, shownRate, shownAverage} of samples) {
+        const stats = Object.freeze({...stateFor().stats, played: 35, win_rate, average, score: 821});
+        const formatted = ui.formatStatistics(stats);
+        assert.equal(formatted['win-rate'], shownRate);
+        assert.equal(formatted.average, shownAverage);
+        assert.equal(formatted.score, '821');
+        assert.equal(stats.win_rate, win_rate);
+        assert.equal(stats.average, average);
+    }
 });
 
 test('очки отображаются целыми, до квалификации показывается прочерк', () => {

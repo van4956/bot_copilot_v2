@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
+import gettext
 
 import pytest
 import pytest_asyncio
@@ -16,7 +17,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app import create_bot, create_dispatcher
-from config_data.config import Config, DataBase, Redis, TgBot
+from common.locales import LANGUAGE_CODES
+from config_data.config import ROOT, Config, DataBase, Redis, TgBot
 from database.models import Base
 from database.orm_users import orm_add_user, orm_get_locale
 from handlers import donate, other, private, start
@@ -463,3 +465,137 @@ async def test_concurrent_language_contexts_do_not_mix_in_public_responses(
             if isinstance(call, SendMessage) and call.chat_id == user_id
         ]
         assert expected in texts[-1]
+
+
+def _translate(language: str, message: str) -> str:
+    """Читает ожидаемый перевод независимо от контекста текущего апдейта."""
+    return gettext.translation(
+        "bot_00_template", localedir=ROOT / "locales", languages=[language]
+    ).gettext(message)
+
+
+@pytest.mark.parametrize("source", LANGUAGE_CODES)
+@pytest.mark.parametrize("target", LANGUAGE_CODES)
+async def test_every_four_language_transition_changes_confirmation_and_next_update(
+    harness: Harness, source: str, target: str,
+) -> None:
+    """Все переходы и повторный выбор согласуют БД, FSM, callback и команды."""
+    from aiogram.methods import SetMyCommands
+
+    dispatcher, bot, sessions, requests = harness
+    bot.wordli_webapp_url = "https://example.invalid/game"
+    await _register(sessions, 101, source)
+    state = dispatcher.fsm.get_context(bot=bot, chat_id=101, user_id=101)
+    await state.set_data({"locale": source, "preserved": 42})
+    await dispatcher.feed_update(bot, _callback(101, target, 800))
+    popup = next(call for call in requests if isinstance(call, AnswerCallbackQuery))
+    header = next(call for call in requests if isinstance(call, SendMessage))
+    sources = {
+        "ru": ("Выбран: 🇷🇺 Русский язык", "Текущий язык \n\n 🇷🇺 Русский"),
+        "en": ("Выбран: 🇺🇸 Английский", "Текущий язык \n\n 🇺🇸 Английский"),
+        "es": ("Выбран: 🇪🇸 Испанский", "Текущий язык \n\n 🇪🇸 Испанский"),
+        "uk": ("Выбран: 🇺🇦 Украинский", "Текущий язык \n\n 🇺🇦 Украинский"),
+    }
+    assert popup.text == _translate(target, sources[target][0])
+    assert header.text == _translate(target, sources[target][1])
+    assert _game_button(header) == _translate(target, "Игры 🕹")
+    assert (await state.get_data())["locale"] == target
+    assert (await state.get_data())["preserved"] == 42
+    commands = next(call for call in requests if isinstance(call, SetMyCommands))
+    assert commands.scope.chat_id == 101 and not commands.language_code
+    assert [command.description for command in commands.commands] == [
+        _translate(target, message)
+        for message in ("Главная панель", "Кулинарная книга", "Настройки")
+    ]
+    async with sessions() as session:
+        assert await orm_get_locale(session, 101) == target
+    # Другой язык Telegram не подменяет выбор ни из кэша, ни после его потери.
+    telegram_locale = "ru" if target != "ru" else "es-MX"
+    await dispatcher.feed_update(bot, _command(101, "/main", 801, telegram_locale))
+    main = next(call for call in reversed(requests) if isinstance(call, SendMessage))
+    assert main.text == _translate(target, "Главная панель")
+    await state.clear()
+    previous = len(requests)
+    await dispatcher.feed_update(bot, _command(101, "/info", 802, telegram_locale))
+    info = next(call for call in requests[previous:] if isinstance(call, SendMessage))
+    assert info.text == _translate(target, "Информация")
+    assert (await state.get_data())["locale"] == target
+
+
+@pytest.mark.parametrize("raw,target", [
+    ("es", "es"), ("es-MX", "es"), ("es_419", "es"),
+    ("uk", "uk"), ("UK-UA", "uk"), ("uk_UA", "uk"), ("fr", "ru"),
+])
+async def test_first_start_normalizes_regional_languages_before_registration(
+    harness: Harness, raw: str, target: str,
+) -> None:
+    """Первый /start распознаёт новые языки и безопасно обрабатывает варианты кода."""
+    dispatcher, bot, sessions, requests = harness
+    bot.wordli_webapp_url = "https://example.invalid/game"
+    await dispatcher.feed_update(bot, _command(101, "/start", 850, raw))
+    main = next(call for call in requests if isinstance(call, SendMessage))
+    assert main.text == _translate(target, "Бот активирован!")
+    assert _game_button(main) == _translate(target, "Игры 🕹")
+    assert len([call for call in requests if isinstance(call, SendPhoto)]) == 1
+    async with sessions() as session:
+        assert await orm_get_locale(session, 101) == target
+
+
+@pytest.mark.parametrize("selected", LANGUAGE_CODES)
+async def test_start_preserves_saved_four_language_choice_even_with_stale_cache(
+    harness: Harness, selected: str,
+) -> None:
+    """Старый кэш и язык Telegram не перезаписывают сохранённый выбор /start."""
+    dispatcher, bot, sessions, requests = harness
+    bot.wordli_webapp_url = "https://example.invalid/game"
+    await _register(sessions, 101, selected)
+    different = "ru" if selected != "ru" else "en"
+    state = dispatcher.fsm.get_context(bot=bot, chat_id=101, user_id=101)
+    await state.set_state("Synthetic:old")
+    await state.set_data({"locale": different, "old_value": 42})
+    await dispatcher.feed_update(bot, _command(101, "/start", 860, different))
+    main = next(call for call in requests if isinstance(call, SendMessage))
+    assert main.text == _translate(selected, "Бот активирован!")
+    assert await state.get_data() == {"locale": selected}
+    assert await state.get_state() is None
+    assert not any(isinstance(call, SendPhoto) for call in requests)
+
+
+async def test_four_users_keep_language_contexts_during_concurrent_replies(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Четыре одновременных ответа не используют общий изменяемый язык."""
+    import asyncio
+
+    dispatcher, bot, sessions, requests = harness
+    users = {index + 101: language for index, language in enumerate(LANGUAGE_CODES)}
+    for user_id, language in users.items():
+        await _register(sessions, user_id, language)
+        state = dispatcher.fsm.get_context(bot=bot, chat_id=user_id, user_id=user_id)
+        await state.set_data({"locale": language})
+    original_send = Bot.__call__
+    waiting = asyncio.Event()
+    arrived = set()
+
+    async def send_together(
+        active_bot: Bot, method: TelegramMethod, **kwargs: object,
+    ) -> Message | bool:
+        """Заставляет ответы четырёх независимых пользователей пересечься."""
+        if isinstance(method, SendMessage):
+            arrived.add(method.chat_id)
+            if len(arrived) == 4:
+                waiting.set()
+            await waiting.wait()
+        return await original_send(active_bot, method, **kwargs)
+
+    monkeypatch.setattr(Bot, "__call__", send_together)
+    await asyncio.wait_for(asyncio.gather(*[
+        dispatcher.feed_update(bot, _command(user_id, "/main", 900 + user_id))
+        for user_id in users
+    ]), timeout=5)
+    for user_id, language in users.items():
+        texts = [
+            call.text for call in requests
+            if isinstance(call, SendMessage) and call.chat_id == user_id
+        ]
+        assert texts == [_translate(language, "Главная панель")]

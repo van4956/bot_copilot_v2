@@ -6,6 +6,7 @@ from typing import Any, Awaitable, Callable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 
+from common.locales import normalize_locale
 from database.orm_users import SUPPORTED_LOCALES, orm_get_locale
 
 logger = logging.getLogger(__name__)
@@ -48,9 +49,14 @@ class LocaleFromDBMiddleware(BaseMiddleware):
                 state_data = await state.get_data()
                 cached_locale = state_data.get("locale")
                 if cached_locale not in SUPPORTED_LOCALES:
-                    if cached_locale is not None:
-                        await state.update_data(locale="ru")
-                    actor = data.get("event_from_user")
+                    actor = data.get("event_from_user") or getattr(
+                        event, "from_user", None,
+                    )
+                    fallback = (
+                        cached_locale if cached_locale is not None
+                        else getattr(actor, "language_code", None)
+                    )
+                    await state.update_data(locale=normalize_locale(fallback))
                     user_id = await get_user_id(event)
                     if actor is not None:
                         user_id = actor.id

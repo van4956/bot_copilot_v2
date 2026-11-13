@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import app
 from common.comands import get_commands, sync_user_commands
+from common.locales import LANGUAGE_CODES
 from config_data.config import Config, DataBase, Redis, TgBot
 from database.models import Base
 from database.orm_users import orm_add_user
@@ -77,8 +78,10 @@ async def test_command_menu_failure_is_nonfatal_and_does_not_log_secret(
     assert "SECRET" not in caplog.text
 
 
+@pytest.mark.parametrize("admin_locale", LANGUAGE_CODES)
 async def test_startup_registers_language_scopes_and_saved_admin_locale(
     monkeypatch: pytest.MonkeyPatch,
+    admin_locale: str,
 ) -> None:
     """Проверяет запуск с SQLite в памяти и полностью подменённым Telegram."""
     config = Config(
@@ -101,7 +104,7 @@ async def test_startup_registers_language_scopes_and_saved_admin_locale(
                 "user_id": 99,
                 "user_name": "offline",
                 "full_name": "Synthetic",
-                "locale": "en",
+                "locale": admin_locale,
             },
         )
     bot = app.create_bot(config)
@@ -124,21 +127,19 @@ async def test_startup_registers_language_scopes_and_saved_admin_locale(
     try:
         await app.main(config)
         calls = bot.set_my_commands.await_args_list
-        assert len(calls) == 4
-        assert [call.kwargs.get("language_code") for call in calls[:3]] == [
+        assert len(calls) == 6
+        assert [call.kwargs.get("language_code") for call in calls[:5]] == [
             "",
             "ru",
             "en",
+            "es",
+            "uk",
         ]
-        assert [call.kwargs["scope"].type for call in calls[:3]] == [
+        assert [call.kwargs["scope"].type for call in calls[:5]] == [
             "all_private_chats"
-        ] * 3
+        ] * 5
         assert calls[-1].kwargs["scope"].chat_id == 99
-        assert [command.description for command in calls[-1].args[0]] == [
-            "Main panel",
-            "Cookbook",
-            "Settings",
-        ]
+        assert calls[-1].args[0] == get_commands(admin_locale)
         assert bot.get_me.await_count == 1
     finally:
         await database.dispose()

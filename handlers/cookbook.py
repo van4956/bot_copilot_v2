@@ -36,16 +36,15 @@ def _clip_text(value: str, limit: int) -> str:
     return clipped.decode("utf-16-le", errors="ignore") + "…"
 
 
-def format_recipe_caption(recipe: Any, *, author_label: str | None = None) -> str:
+def format_recipe_caption(recipe: Any) -> str:
     """Создаёт экранированную подпись, не разрезая HTML-разметку."""
     name = _clip_text(str(recipe.recipe_name or ""), 150)
     author = _clip_text(str(recipe.author or ""), 150)
-    author_label = _("Автор:") if author_label is None else author_label
-    heading = f"{name}\n{author_label} {author}\n\n"
+    heading = f"{name}\n{author}\n\n"
     remaining = 1024 - len(heading.encode("utf-16-le")) // 2
     description = _clip_text(str(recipe.description or ""), remaining)
     return (
-        f"<b>{escape(name)}</b>\n<i>{escape(author_label)} {escape(author)}</i>\n\n"
+        f"<b>{escape(name)}</b>\n<i>{escape(author)}</i>\n\n"
         f"{escape(description)}"
     )
 

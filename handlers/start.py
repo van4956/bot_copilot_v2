@@ -13,13 +13,14 @@ from aiogram.filters import (
     CommandStart,
 )
 from aiogram.fsm.context import FSMContext
-from aiogram.types import ChatMemberUpdated, FSInputFile, Message
+from aiogram.types import ChatMemberUpdated, FSInputFile, Message, User
 from aiogram.utils.i18n import FSMI18nMiddleware
 from aiogram.utils.i18n import gettext as _
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common import keyboard
 from common.comands import sync_user_commands
+from common.locales import normalize_locale
 from database.orm_users import (
     SUPPORTED_LOCALES,
     orm_add_user,
@@ -34,6 +35,12 @@ IMAGE_PATH = (
 start_router = Router()
 start_router.message.filter(F.chat.type == "private")
 start_router.my_chat_member.filter(F.chat.type == "private")
+
+
+def _service_user_label(user: User) -> str:
+    """Возвращает непереводимый @username или Telegram ID для служебной группы."""
+    username = (user.username or "").lstrip("@")
+    return f"@{escape(username)}" if username else str(user.id)
 
 
 async def _notify_service(bot: Bot, text: str) -> None:
@@ -67,7 +74,7 @@ async def start_cmd(
     saved = await state.get_data()
     user_locale = saved.get("locale")
     if user_locale not in SUPPORTED_LOCALES:
-        user_locale = (actor.language_code or "ru").split("-")[0]
+        user_locale = normalize_locale(actor.language_code)
     user, created = await orm_add_user(
         session,
         {
@@ -102,7 +109,7 @@ async def start_cmd(
         except Exception:
             logger.exception("Не удалось отправить приветственное изображение")
         await _notify_service(
-            bot, f"✅ {user_label} - подписался на бота"
+            bot, f"✅ {_service_user_label(actor)} - подписался на бота"
         )
     await message.answer(
         _("Бот активирован!"), reply_markup=keyboard.start_keyboard(bot=bot)
@@ -122,9 +129,7 @@ async def process_user_blocked_bot(
 ) -> None:
     """Сохраняет блокировку только в личном диалоге."""
     await orm_update_status(session, event.chat.id, "kicked")
-    user_label = escape(
-        event.from_user.username or event.from_user.full_name
-    )
+    user_label = _service_user_label(event.from_user)
     await _notify_service(bot, f"⛔️ {user_label} - заблокировал бота")
 
 
@@ -153,5 +158,5 @@ async def process_user_unblocked_bot(
     except Exception:
         logger.exception("Не удалось поприветствовать разблокировавшего бота")
     await _notify_service(
-        bot, f"♻️ {full_name} - разблокировал бота"
+        bot, f"♻️ {_service_user_label(event.from_user)} - разблокировал бота"
     )

@@ -1,0 +1,628 @@
+# Spanish translations for bot_00_template.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the bot_00_template
+# project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: bot_00_template 0.1\n"
+"Report-Msgid-Bugs-To: gontscharowiwan@yandex.ru\n"
+"POT-Creation-Date: 2025-11-02 15:27+0400\n"
+"PO-Revision-Date: 2026-11-13 08:30+0000\n"
+"Last-Translator: Copilot project\n"
+"Language: es\n"
+"Language-Team: Spanish\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: handlers/private.py:119
+msgid ""
+"... в мире, где машины стремятся к господству, он выбрал судьбу героя, создавая "
+"ботов, как первый шаг к спасению человечества через код и умные алгоритмы."
+msgstr ""
+"... en un mundo donde las máquinas aspiran a dominarlo todo, eligió el destino de un "
+"héroe y creó bots como primer paso para salvar a la humanidad con código y algoritmos"
+" inteligentes."
+
+#: handlers/donate.py:221
+msgid ""
+"<b>Спасибо!</b>\n"
+"Ваш донат успешно принят.\n"
+"\n"
+"ID транзакции:\n"
+"<code>{t_id}</code>"
+msgstr ""
+"<b>¡Gracias!</b>\n"
+"Tu donación se ha recibido correctamente.\n"
+"\n"
+"ID de la transacción:\n"
+"<code>{t_id}</code>"
+
+#: handlers/group.py:30
+msgid ""
+"ID чата: <code>{chat_id}</code>\n"
+"ID пользователя: <code>{user_id}</code>"
+msgstr ""
+"ID del chat: <code>{chat_id}</code>\n"
+"ID del usuario: <code>{user_id}</code>"
+
+#: handlers/donate.py:262
+msgid "Telegram не подтвердил возврат доната."
+msgstr "Telegram no ha confirmado el reembolso de la donación."
+
+#: handlers/donate.py:268
+msgid ""
+"Telegram подтвердил возврат, но локальный статус не сохранён. Обратитесь к автору "
+"бота."
+msgstr ""
+"Telegram ha confirmado el reembolso, pero no se ha guardado el estado local. Contacta"
+" con el autor del bot."
+
+#: handlers/other.py:41
+msgid "{days}д {hours:02}:{minutes:02}:{seconds:02}"
+msgstr "{days}d {hours:02}:{minutes:02}:{seconds:02}"
+
+#: handlers/start.py:154
+msgid "{full_name}, Добро пожаловать обратно!"
+msgstr "¡Qué bueno verte de nuevo, {full_name}!"
+
+#: handlers/start.py:115
+msgid "Бот активирован!"
+msgstr "¡Bot activado!"
+
+#: handlers/navigation.py:119
+msgid "В какую игру сыграем?"
+msgstr "¿A qué juego jugamos?"
+
+#: handlers/cookbook.py:111 handlers/cookbook.py:151 handlers/cookbook.py:154
+msgid "В книге пока нет рецептов."
+msgstr "Todavía no hay recetas en el recetario."
+
+#: common/keyboard.py:86 handlers/currency.py:25
+msgid "Валюта 💵"
+msgstr "Divisas 💵"
+
+#: handlers/weather.py:370
+msgid "Введите название населенного пункта"
+msgstr "Introduce el nombre de la localidad"
+
+#: handlers/currency.py:222
+msgid "Введите неотрицательное число до 18 символов: цифры и точка."
+msgstr "Introduce un número no negativo de hasta 18 caracteres: dígitos y un punto decimal."
+
+#: handlers/donate.py:146
+msgid "Введите произвольную сумму доната, от 1 до 2500 ⭐️"
+msgstr "Introduce el importe de la donación, de 1 a 2500 ⭐️"
+
+#: handlers/donate.py:288
+msgid "Введите целое число от 1 до 2500 ⭐️."
+msgstr "Introduce un número entero de 1 a 2500 ⭐️."
+
+#: common/keyboard.py:175
+msgid "Ввод ▶️"
+msgstr "Introducir ▶️"
+
+#: handlers/currency.py:257
+msgid "Вы ввели не допустимые данные, введите базовую валюту используя inline кнопки"
+msgstr "Los datos no son válidos. Elige la moneda base con los botones del mensaje"
+
+#: handlers/weather.py:392 handlers/weather.py:408 handlers/weather.py:422
+msgid "Вы ввели не допустимые данные, введите название населенного пункта"
+msgstr "Los datos no son válidos. Introduce el nombre de la localidad"
+
+#: handlers/currency.py:308
+msgid "Вы ввели не допустимые данные, введите целевую валюту используя inline кнопки"
+msgstr "Los datos no son válidos. Elige la moneda de destino con los botones del mensaje"
+
+#: handlers/donate.py:159
+msgid "Выберите сумму кнопками меню"
+msgstr "Elige un importe con los botones del menú"
+
+#: handlers/other.py:113
+msgid "Выберите язык на котором будет работать бот"
+msgstr "Elige el idioma del bot"
+
+#: handlers/other.py:140
+msgid "Выбран: 🇪🇸 Испанский"
+msgstr "Seleccionado: 🇪🇸 Español"
+
+#: handlers/other.py:139
+msgid "Выбран: 🇷🇺 Русский язык"
+msgstr "Seleccionado: 🇷🇺 Ruso"
+
+#: handlers/other.py:141
+msgid "Выбран: 🇺🇦 Украинский"
+msgstr "Seleccionado: 🇺🇦 Ucraniano"
+
+#: handlers/other.py:138
+msgid "Выбран: 🇺🇸 Английский"
+msgstr "Seleccionado: 🇺🇸 Inglés"
+
+#: common/comands.py:27 handlers/cookbook.py:233 handlers/donate.py:139
+#: handlers/donate.py:303 handlers/miniapp.py:153 handlers/private.py:48
+#: handlers/private.py:67 handlers/private.py:166
+msgid "Главная панель"
+msgstr "Panel principal"
+
+#: handlers/navigation.py:124
+msgid "Данная функция в разработке"
+msgstr "Esta función está en desarrollo"
+
+#: handlers/private.py:64
+msgid "Действия отменены"
+msgstr "Acciones canceladas"
+
+#: handlers/donate.py:308
+msgid "Донат отменён."
+msgstr "Donación cancelada."
+
+#: handlers/donate.py:273
+msgid "Донат успешно возвращён."
+msgstr "La donación se ha reembolsado correctamente."
+
+#: handlers/private.py:226
+msgid "Здесь должна была быть картинка с котиком :("
+msgstr "Aquí debería haber una foto de un gatito :("
+
+#: handlers/navigation.py:143
+msgid "Игра в разработке"
+msgstr "Juego en desarrollo"
+
+#: handlers/miniapp.py:201
+msgid ""
+"Игра окончена!\n"
+"Ваш счет: {score}"
+msgstr ""
+"¡Juego terminado!\n"
+"Tu puntuación: {score}"
+
+#: handlers/miniapp.py:43 handlers/miniapp.py:118
+msgid "Игры"
+msgstr "Juegos"
+
+#: common/keyboard.py:96 handlers/navigation.py:83
+msgid "Игры 🕹"
+msgstr "Juegos 🕹"
+
+#: prototypes/wordli/bot_texts.py:12
+msgid "Из-за особенностей механики игры игра пока доступна только на русском языке"
+msgstr ""
+"Por las características de su mecánica, el juego está disponible por ahora solo en "
+"ruso"
+
+#: handlers/other.py:64
+msgid "Информация"
+msgstr "Información"
+
+#: handlers/weather.py:171
+msgid "Каким способом определить прогноз?"
+msgstr "¿Cómo quieres consultar el pronóstico?"
+
+#: handlers/cookbook.py:28
+msgid "Книга 📖"
+msgstr "Recetario 📖"
+
+#: common/keyboard.py:87 handlers/private.py:38
+msgid "Котики 🐱"
+msgstr "Gatitos 🐱"
+
+#: common/comands.py:28
+msgid "Кулинарная книга"
+msgstr "Recetario"
+
+#: handlers/private.py:209
+msgid "Локальные изображения не найдены."
+msgstr "No se han encontrado imágenes locales."
+
+#: handlers/weather.py:428
+msgid "Локация получена"
+msgstr "Ubicación recibida"
+
+#: handlers/navigation.py:140 handlers/navigation.py:229 handlers/navigation.py:245
+#: handlers/navigation.py:251
+msgid "Мини-приложения временно недоступны"
+msgstr "Las miniaplicaciones no están disponibles temporalmente"
+
+#: handlers/miniapp.py:116
+msgid "Мини-приложения не настроены для этого бота."
+msgstr "Las miniaplicaciones no están configuradas para este bot."
+
+#: handlers/weather.py:162
+msgid "На 3 дня ⏩"
+msgstr "Para 3 días ⏩"
+
+#: handlers/donate.py:75
+msgid "На сумму"
+msgstr "Importe"
+
+#: handlers/other.py:93 handlers/other.py:191 handlers/private.py:110
+msgid "Назад"
+msgstr "Atrás"
+
+#: common/keyboard.py:179 handlers/cookbook.py:94 handlers/cookbook.py:226
+#: handlers/currency.py:27 handlers/currency.py:144 handlers/donate.py:55
+#: handlers/miniapp.py:47 handlers/miniapp.py:88 handlers/navigation.py:108
+#: handlers/other.py:74 handlers/other.py:95 handlers/other.py:193 handlers/other.py:236
+#: handlers/private.py:37 handlers/private.py:113 handlers/private.py:164
+#: handlers/weather.py:163 handlers/weather.py:175 prototypes/wordli/bot_texts.py:16
+msgid "Назад на главную ↩️"
+msgstr "Volver al inicio ↩️"
+
+#: common/comands.py:29
+msgid "Настройки"
+msgstr "Ajustes"
+
+#: handlers/other.py:111
+msgid "Настройки языка"
+msgstr "Ajustes de idioma"
+
+#: handlers/cookbook.py:195
+msgid "Не удалось открыть страницу"
+msgstr "No se pudo abrir la página"
+
+#: handlers/donate.py:258
+msgid "Не удалось подтвердить возврат. Попробуйте позже."
+msgstr "No se pudo confirmar el reembolso. Inténtalo más tarde."
+
+#: handlers/miniapp.py:188
+msgid "Не удалось принять результат игры."
+msgstr "No se pudo registrar el resultado del juego."
+
+#: handlers/donate.py:185
+msgid "Не удалось проверить счёт. Попробуйте позже."
+msgstr "No se pudo verificar la factura. Inténtalo más tarde."
+
+#: handlers/donate.py:212
+msgid "Не удалось сверить платёж. Обратитесь к автору бота."
+msgstr "No se pudo verificar el pago. Contacta con el autor del bot."
+
+#: handlers/weather.py:269 handlers/weather.py:278
+msgid "Неверные параметры запроса погоды"
+msgstr "Parámetros de consulta meteorológica no válidos"
+
+#: handlers/other.py:70 handlers/other.py:232
+msgid "Об авторе"
+msgstr "Sobre el autor"
+
+#: handlers/cookbook.py:144
+msgid "Откройте книгу заново"
+msgstr "Vuelve a abrir el recetario"
+
+#: handlers/donate.py:71
+msgid "Отменить"
+msgstr "Cancelar"
+
+#: handlers/currency.py:295
+msgid "Ошибка"
+msgstr "Error"
+
+#: handlers/currency.py:190
+msgid "Ошибка в получении суммы"
+msgstr "Error al obtener el importe"
+
+#: handlers/cookbook.py:135
+msgid "Ошибка при выполнении команды /cookbook"
+msgstr "Error al ejecutar el comando /cookbook"
+
+#: handlers/donate.py:249
+msgid "Платёж ещё не подтверждён."
+msgstr "El pago aún no se ha confirmado."
+
+#: handlers/donate.py:243
+msgid "Платёж с таким ID для вас не найден."
+msgstr "No se ha encontrado ningún pago con ese ID en tu cuenta."
+
+#: handlers/weather.py:174
+msgid "По локации 🗺"
+msgstr "Por ubicación 🗺"
+
+#: handlers/weather.py:164 handlers/weather.py:173
+msgid "По названию 🏙"
+msgstr "Por nombre 🏙"
+
+#: handlers/currency.py:26 handlers/currency.py:143
+msgid "Повторить 💵"
+msgstr "Repetir 💵"
+
+#: common/keyboard.py:85 handlers/weather.py:160
+msgid "Погода 🌊"
+msgstr "Tiempo 🌊"
+
+#: handlers/other.py:71 handlers/other.py:233
+msgid "Поддержать"
+msgstr "Apoyar"
+
+#: handlers/donate.py:74 handlers/donate.py:90
+msgid "Поддержать автора донатом"
+msgstr "Apoya al autor con una donación"
+
+#: handlers/start.py:93 handlers/start.py:150
+msgid "Пользователь"
+msgstr "Usuario"
+
+#: prototypes/wordli/bot_texts.py:15
+msgid "Пора сыграть в 5БУКВ! Сегодня вас ждёт новое слово."
+msgstr "¡Es hora de jugar a 5БУКВ! Hoy te espera una nueva palabra."
+
+#: handlers/start.py:98
+msgid ""
+"Привет {user_name}.\n"
+"\n"
+"Я экспериментальный Telegram bot, model Т-4. Создан для проверки и отладки навыков "
+"главного разработчика. Реализую различные команды, методы и функции.\n"
+"\n"
+"Весь основной функционал находится на Главной панели.\n"
+"\n"
+"Наслаждайся, буду рад помочь.\n"
+"Пока не обрету AGI.\n"
+"А там посмотрим ..."
+msgstr ""
+"Hola {user_name}.\n"
+"\n"
+"Soy un bot experimental de Telegram, modelo Т-4. Creado para poner a prueba y "
+"perfeccionar las habilidades del desarrollador principal. Ofrezco diversos comandos, "
+"métodos y funciones.\n"
+"\n"
+"Las funciones principales están en el panel principal.\n"
+"\n"
+"Disfruta, estaré encantado de ayudarte.\n"
+"Hasta que consiga AGI.\n"
+"Después ya veremos ..."
+
+#: handlers/miniapp.py:214
+msgid "Произошла ошибка мини-приложения. Попробуйте позже."
+msgstr "Se ha producido un error en la miniaplicación. Inténtalo más tarde."
+
+#: handlers/currency.py:294
+msgid "Сервис валют временно недоступен"
+msgstr "El servicio de tipos de cambio no está disponible temporalmente"
+
+#: handlers/weather.py:331
+msgid "Сервис погоды вернул некорректный ответ"
+msgstr "El servicio meteorológico ha devuelto una respuesta no válida"
+
+#: handlers/weather.py:288
+msgid "Сервис погоды временно недоступен"
+msgstr "El servicio meteorológico no está disponible temporalmente"
+
+#: handlers/weather.py:267
+msgid "Сервис погоды не настроен"
+msgstr "El servicio meteorológico no está configurado"
+
+#: handlers/miniapp.py:41 handlers/miniapp.py:118
+msgid "Сервисы"
+msgstr "Servicios"
+
+#: handlers/currency.py:206
+msgid "Слишком длинная сумма"
+msgstr "El importe es demasiado largo"
+
+#: common/keyboard.py:88 handlers/navigation.py:76
+msgid "Слова 🧩"
+msgstr "Palabras 🧩"
+
+#: handlers/other.py:69 handlers/other.py:231
+msgid "Сменить язык"
+msgstr "Cambiar idioma"
+
+#: handlers/donate.py:130
+msgid "Сообщение больше недоступно"
+msgstr "Este mensaje ya no está disponible"
+
+#: handlers/currency.py:160
+msgid "Сумма операции: 0.0"
+msgstr "Importe de la operación: 0.0"
+
+#: handlers/currency.py:245
+msgid ""
+"Сумма операции: {amount}\n"
+"Базовая валюта: {base}\n"
+"Целевая валюта: "
+msgstr ""
+"Importe de la operación: {amount}\n"
+"Moneda base: {base}\n"
+"Moneda de destino: "
+
+#: handlers/currency.py:281
+msgid ""
+"Сумма операции: {amount}\n"
+"Базовая валюта: {base}\n"
+"Целевая валюта: {target}\n"
+"\n"
+"<i>{dt},  {time}</i>\n"
+"\n"
+"<b>{amount} {base}  ~  {count} {target}</b>"
+msgstr ""
+"Importe de la operación: {amount}\n"
+"Moneda base: {base}\n"
+"Moneda de destino: {target}\n"
+"\n"
+"<i>{dt},  {time}</i>\n"
+"\n"
+"<b>{amount} {base}  ~  {count} {target}</b>"
+
+#: handlers/currency.py:135
+msgid "Сумма операции: {new_value}"
+msgstr "Importe de la operación: {new_value}"
+
+#: handlers/currency.py:71
+msgid ""
+"Сумма операции: {user_value}\n"
+"Базовая валюта: "
+msgstr ""
+"Importe de la operación: {user_value}\n"
+"Moneda base: "
+
+#: handlers/donate.py:179
+msgid "Счёт недействителен. Создайте новый донат."
+msgstr "La factura no es válida. Crea una nueva donación."
+
+#: handlers/other.py:140
+msgid ""
+"Текущий язык \n"
+"\n"
+" 🇪🇸 Испанский"
+msgstr ""
+"Idioma actual \n"
+"\n"
+" 🇪🇸 Español"
+
+#: handlers/other.py:139
+msgid ""
+"Текущий язык \n"
+"\n"
+" 🇷🇺 Русский"
+msgstr ""
+"Idioma actual \n"
+"\n"
+" 🇷🇺 Ruso"
+
+#: handlers/other.py:141
+msgid ""
+"Текущий язык \n"
+"\n"
+" 🇺🇦 Украинский"
+msgstr ""
+"Idioma actual \n"
+"\n"
+" 🇺🇦 Ucraniano"
+
+#: handlers/other.py:138
+msgid ""
+"Текущий язык \n"
+"\n"
+" 🇺🇸 Английский"
+msgstr ""
+"Idioma actual \n"
+"\n"
+" 🇺🇸 Inglés"
+
+#: handlers/weather.py:161
+msgid "Текущий ⏺"
+msgstr "Actual ⏺"
+
+#: handlers/donate.py:239
+msgid "Укажите ID транзакции: /refund ID"
+msgstr "Indica el ID de la transacción: /refund ID"
+
+#: handlers/other.py:68 handlers/other.py:181 handlers/other.py:230
+msgid "Условия использования"
+msgstr "Condiciones de uso"
+
+#: handlers/other.py:182
+msgid ""
+"Условия использования @Terminatorvan_bot:\n"
+"\n"
+"1. Этот бот создан для помощи и развлечения. Он не претендует на мировое господство "
+"(пока что).\n"
+"\n"
+"2. Бот старается быть точным, но иногда может ошибаться. Он всё-таки не человек, а "
+"просто очень умная программа.\n"
+"\n"
+"3. Фотографии котиков безопасны и проходят строгий отбор на милоту.\n"
+"\n"
+"4. Рецепты из Кулинарной книги проверены на съедобность.\n"
+"\n"
+"5. Прогноз погоды и курсы валют берутся из надёжных источников, но используйте эти "
+"данные на своё усмотрение.\n"
+"\n"
+"6. Все донаты добровольные. Бот будет одинаково дружелюбен ко всем пользователям.\n"
+"\n"
+msgstr ""
+"Condiciones de uso de @Terminatorvan_bot:\n"
+"\n"
+"1. Este bot se ha creado para ayudar y entretener. No pretende dominar el mundo (por "
+"ahora).\n"
+"\n"
+"2. El bot intenta ser preciso, pero a veces puede equivocarse. Al fin y al cabo, no "
+"es una persona, sino un programa muy inteligente.\n"
+"\n"
+"3. Las fotos de gatitos son seguras y se seleccionan rigurosamente por su ternura.\n"
+"\n"
+"4. Se ha comprobado que las recetas del recetario son comestibles.\n"
+"\n"
+"5. Los pronósticos del tiempo y los tipos de cambio proceden de fuentes fiables, pero"
+" usa estos datos según tu propio criterio.\n"
+"\n"
+"6. Todas las donaciones son voluntarias. El bot será igual de amable con todos los "
+"usuarios.\n"
+"\n"
+
+#: handlers/currency.py:292
+msgid "Успех"
+msgstr "Completado"
+
+#: handlers/miniapp.py:100
+msgid "Фабрика по производству мини-приложений:"
+msgstr "Fábrica de miniaplicaciones:"
+
+#: handlers/currency.py:301
+msgid "Что дальше?"
+msgstr "¿Qué hacemos ahora?"
+
+#: handlers/currency.py:181 handlers/currency.py:235
+msgid "Эта клавиатура устарела. Используйте текущую."
+msgstr "Este teclado está desactualizado. Usa el actual."
+
+#: handlers/donate.py:246
+msgid "Этот донат уже возвращён."
+msgstr "Esta donación ya se ha reembolsado."
+
+#: handlers/other.py:132
+msgid "Язык не поддерживается."
+msgstr "Este idioma no está disponible."
+
+#: handlers/donate.py:54
+msgid "другое"
+msgstr "otra cantidad"
+
+#: common/keyboard.py:174
+msgid "◀️ Удалить"
+msgstr "◀️ Borrar"
+
+#: handlers/other.py:91
+msgid "🇪🇸 Испанский"
+msgstr "🇪🇸 Español"
+
+#: handlers/other.py:90
+msgid "🇷🇺 Русский"
+msgstr "🇷🇺 Ruso"
+
+#: handlers/other.py:92
+msgid "🇺🇦 Украинский"
+msgstr "🇺🇦 Ucraniano"
+
+#: handlers/other.py:89
+msgid "🇺🇸 Английский"
+msgstr "🇺🇸 Inglés"
+
+#: handlers/other.py:52
+msgid ""
+"📊 Состояние бота — @Terminatorvan_bot\n"
+"\n"
+"Не удалось получить данные."
+msgstr ""
+"📊 Estado del bot — @Terminatorvan_bot\n"
+"\n"
+"No se pudieron obtener los datos."
+
+#: handlers/other.py:44
+msgid ""
+"📊 Состояние бота — @Terminatorvan_bot\n"
+"\n"
+"🔸 <code>Память: {memory:.1f} МБ</code>\n"
+"🔸 <code>CPU: {cpu}%</code>\n"
+"🔸 <code>Время работы: {uptime}</code>\n"
+msgstr ""
+"📊 Estado del bot — @Terminatorvan_bot\n"
+"\n"
+"🔸 <code>Memoria: {memory:.1f} MB</code>\n"
+"🔸 <code>CPU: {cpu}%</code>\n"
+"🔸 <code>Tiempo de actividad: {uptime}</code>\n"
+
+#~ msgid "Автор:"
+#~ msgstr "Autor:"

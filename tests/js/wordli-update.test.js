@@ -160,6 +160,20 @@ test('собственная строка сохраняет подсветку 
     assert.match(css, /\.leaderboard-table tbody > tr:first-child td, \.leaderboard-separator \+ tr td\s*\{\s*border-top:\s*0;/);
 });
 
+test('в рейтинге нет линий между любыми участниками, подсветка и отступ сохранены', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '../../prototypes/wordli/styles.css'), 'utf8');
+    const cells = css.match(/\.leaderboard-table td\s*\{([^}]+)\}/)[1];
+    assert.match(cells, /border-top:\s*0;/);
+    for (const [, selector, declarations] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (!selector.includes('.leaderboard')) continue;
+        for (const [, value] of declarations.matchAll(/\bborder(?:-(?:top|right|bottom|left))?\s*:\s*([^;]+)/g)) {
+            assert.match(value.trim(), /^(?:0(?:px)?|none)(?:\s|$)/);
+        }
+    }
+    assert.match(css, /\.leaderboard-self td\s*\{[^}]*background:\s*#ffffff09/);
+    assert.match(css, /\.leaderboard-separator td\s*\{[^}]*height:\s*15px;[^}]*padding:\s*0;/);
+});
+
 test('имя рейтинга сохраняет 14 символов, две точки идут сверх лимита', () => {
     assert.equal(ui.LEADERBOARD_NAME_LIMIT, 14);
     assert.equal(ui.formatLeaderboardName('Ivan Goncharov'), 'Ivan Goncharov');
