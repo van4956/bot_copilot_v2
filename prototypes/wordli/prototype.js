@@ -228,11 +228,37 @@
         return state;
     }
 
-    /** Передаёт данные только на игровые адреса этого же приложения. */
-    async function requestApi(fetchFunction, endpoint, payload) {
-        const community = ['/api/settings', '/api/leaderboard'].includes(endpoint);
+    /** Принимает короткое определение и только безопасную ссылку на источник. */
+    function validateDefinition(value, expectedWord) {
+        const invalid = () => { throw new LocalApiError('invalid_response', 'Определение временно недоступно'); };
+        if (!value || value.word !== expectedWord || !/^[А-Я]{5}$/u.test(value.word)
+            || !['found', 'not_found'].includes(value.status) || !Array.isArray(value.definitions)
+            || value.definitions.length > 2
+            || (value.status === 'found' ? !value.definitions.length : value.definitions.length)
+            || value.definitions.some(text => typeof text !== 'string' || !text.trim())
+            || value.definitions.join('').length > 350
+            || (value.headword !== undefined && (typeof value.headword !== 'string' || value.headword.length > 80))) invalid();
+        let sourceUrl = null;
+        if (value.source_url !== undefined && value.source_url !== null) {
+            try {
+                const url = new URL(value.source_url);
+                if (url.protocol !== 'https:' || url.hostname !== 'ru.wiktionary.org'
+                    || !url.pathname.startsWith('/wiki/') || url.username || url.password || url.port) invalid();
+                sourceUrl = url.href;
+            } catch (_) { invalid(); }
+        }
+        if (value.status === 'found' && !sourceUrl) invalid();
+        return {...value, source_url: sourceUrl};
+    }
+
+    /** Передаёт данные только на разрешённые адреса этого же приложения. */
+    async function requestApi(fetchFunction, endpoint, payload, {signal = null} = {}) {
+        const community = ['/api/settings', '/api/leaderboard', '/api/definition'].includes(endpoint);
         if (!community && !['/api/state', '/api/guess', '/api/next', '/api/draft'].includes(endpoint)) throw new Error('Unsupported API endpoint');
         const controller = new AbortController();
+        const abort = () => controller.abort();
+        if (signal?.aborted) abort();
+        else signal?.addEventListener('abort', abort, {once: true});
         const timer = setTimeout(() => controller.abort(), 12000);
         try {
             const response = await fetchFunction(endpoint, {
@@ -252,6 +278,7 @@
                     response.status, result?.state || null,
                 );
             }
+            if (endpoint === '/api/definition') return validateDefinition(result, payload.word);
             if (endpoint === '/api/leaderboard') validateLeaderboard(result?.leaderboard);
             else if (endpoint === '/api/settings') {
                 if (!result?.settings || typeof result.settings.timezone !== 'string'
@@ -264,7 +291,10 @@
             if (error instanceof LocalApiError) throw error;
             if (error?.code === 'authentication_failed') throw new LocalApiError(error.code, error.message, 401);
             throw new LocalApiError('unavailable', 'Локальный игровой сервер недоступен');
-        } finally { clearTimeout(timer); }
+        } finally {
+            clearTimeout(timer);
+            signal?.removeEventListener('abort', abort);
+        }
     }
 
     function signature(history) { return JSON.stringify(history); }
@@ -272,10 +302,21 @@
     function formatProgressWord(word) { return word ? word.toLocaleUpperCase('ru-RU') : ''; }
 
     /** Будущие слова скрыты пятью круглыми элементами, а не символами шрифта. */
-    function createProgressWord(doc, value) {
-        const word = doc.createElement('span');
+    function createProgressWord(doc, value, {interactive = false} = {}) {
+        const word = doc.createElement(value && interactive ? 'button' : 'span');
         word.className = 'progress-word';
-        if (value) word.textContent = formatProgressWord(value);
+        if (value) {
+            word.textContent = formatProgressWord(value);
+            if (interactive) {
+                word.className += ' progress-word--interactive';
+                word.type = 'button';
+                word.dataset.definitionWord = formatProgressWord(value);
+                word.setAttribute('aria-label', `${formatProgressWord(value)} — значение слова`);
+                word.setAttribute('aria-haspopup', 'dialog');
+                word.setAttribute('aria-expanded', 'false');
+                word.setAttribute('aria-controls', 'definition-popover');
+            }
+        }
         else {
             word.className += ' progress-word--pending';
             word.setAttribute('aria-hidden', 'true');
@@ -286,6 +327,182 @@
             }
         }
         return word;
+    }
+
+    /** Размещает карточку около слова, не выходя за края видимой области. */
+    function definitionPosition(anchor, size, viewport) {
+        const margin = 14;
+        const gap = 12;
+        const leftEdge = (viewport.left || 0) + margin;
+        const topEdge = (viewport.top || 0) + margin;
+        const rightEdge = (viewport.left || 0) + viewport.width - margin;
+        const bottomEdge = (viewport.top || 0) + viewport.height - margin;
+        const above = anchor.top - gap - size.height >= topEdge;
+        const left = Math.max(leftEdge, Math.min(anchor.left + anchor.width / 2 - size.width / 2, rightEdge - size.width));
+        const preferredTop = above ? anchor.top - gap - size.height : anchor.bottom + gap;
+        const top = Math.max(topEdge, Math.min(preferredTop, bottomEdge - size.height));
+        return {left, top, placement: above ? 'above' : 'below'};
+    }
+
+    /** Показывает только первое значение, начиная его со строчной буквы. */
+    function formatDefinitionMeaning(definitions) {
+        const first = definitions[0]?.trim() || '';
+        return first.replace(/\p{L}/u, letter => letter.toLocaleLowerCase('ru-RU'));
+    }
+
+    /** Управляет одной карточкой; отменённый запрос не может открыть её повторно. */
+    function createDefinitionPopover(doc, request) {
+        const win = doc.defaultView;
+        const card = doc.getElementById('definition-popover');
+        if (!card) return null;
+        const title = doc.getElementById('definition-title');
+        const status = doc.getElementById('definition-status');
+        const meanings = doc.getElementById('definition-meanings');
+        const source = doc.getElementById('definition-source');
+        const attribution = doc.getElementById('definition-attribution');
+        let anchor = null;
+        let word = null;
+        let pinned = false;
+        let generation = 0;
+        let controller = null;
+        let hoverTimer;
+        let closeTimer;
+
+        function cancelTimers() {
+            win.clearTimeout(hoverTimer);
+            win.clearTimeout(closeTimer);
+        }
+        function close({restoreFocus = false} = {}) {
+            cancelTimers();
+            generation += 1;
+            controller?.abort();
+            controller = null;
+            anchor?.setAttribute('aria-expanded', 'false');
+            card.hidden = true;
+            if (restoreFocus && anchor?.isConnected) anchor.focus({preventScroll: true});
+            anchor = null;
+            word = null;
+            pinned = false;
+        }
+        function reposition() {
+            if (card.hidden) return;
+            if (!anchor?.isConnected) { close(); return; }
+            const visible = win.visualViewport;
+            const viewport = {
+                left: visible?.offsetLeft || 0, top: visible?.offsetTop || 0,
+                width: visible?.width || win.innerWidth, height: visible?.height || win.innerHeight,
+            };
+            card.style.maxWidth = `${Math.max(0, viewport.width - 28)}px`;
+            card.style.maxHeight = `${Math.max(0, viewport.height - 28)}px`;
+            const position = definitionPosition(anchor.getBoundingClientRect(), card.getBoundingClientRect(), viewport);
+            card.style.left = `${position.left}px`;
+            card.style.top = `${position.top}px`;
+            card.dataset.placement = position.placement;
+        }
+        function render(result) {
+            card.dataset.state = result.status;
+            title.textContent = result.headword?.trim() || word.toLocaleLowerCase('ru-RU');
+            status.hidden = result.status === 'found';
+            status.textContent = result.status === 'not_found' ? 'Короткое определение пока не найдено' : '';
+            meanings.replaceChildren();
+            meanings.hidden = result.status !== 'found';
+            if (result.status === 'found') {
+                const meaning = doc.createElement('li');
+                meaning.className = 'definition-meaning';
+                meaning.textContent = formatDefinitionMeaning(result.definitions);
+                meanings.appendChild(meaning);
+            }
+            source.hidden = !result.source_url;
+            attribution.hidden = result.status !== 'found' || !result.source_url;
+            if (result.source_url) source.href = result.source_url;
+            else source.removeAttribute('href');
+            card.setAttribute('aria-busy', 'false');
+            reposition();
+        }
+        async function open(trigger, pin = false) {
+            cancelTimers();
+            if (anchor === trigger && !card.hidden) { pinned = pinned || pin; return; }
+            close();
+            anchor = trigger;
+            word = trigger.dataset.definitionWord;
+            pinned = pin;
+            anchor.setAttribute('aria-expanded', 'true');
+            title.textContent = word.toLocaleLowerCase('ru-RU');
+            status.hidden = false;
+            status.textContent = 'Ищем значение…';
+            meanings.hidden = true;
+            meanings.replaceChildren();
+            source.hidden = true;
+            attribution.hidden = true;
+            source.removeAttribute('href');
+            card.dataset.state = 'loading';
+            card.setAttribute('aria-busy', 'true');
+            card.hidden = false;
+            reposition();
+            const current = generation;
+            controller = new AbortController();
+            try {
+                const result = await request(word, {signal: controller.signal});
+                if (current !== generation || card.hidden) return;
+                render(result);
+            } catch (_) {
+                if (current !== generation || card.hidden) return;
+                card.dataset.state = 'error';
+                card.setAttribute('aria-busy', 'false');
+                status.textContent = 'Не удалось загрузить значение. Попробуйте позже';
+                reposition();
+            }
+        }
+        function deferClose() {
+            win.clearTimeout(hoverTimer);
+            if (!pinned) closeTimer = win.setTimeout(() => close(), 200);
+        }
+        const triggerOf = target => target?.closest?.('button[data-definition-word]');
+        doc.addEventListener('click', event => {
+            const trigger = triggerOf(event.target);
+            if (trigger) {
+                if (anchor === trigger && !card.hidden && pinned) close();
+                else open(trigger, true);
+            } else if (!card.contains(event.target)) close();
+        });
+        doc.addEventListener('pointerover', event => {
+            if (event.pointerType !== 'mouse') return;
+            const trigger = triggerOf(event.target);
+            if (card.contains(event.target)) { win.clearTimeout(closeTimer); return; }
+            if (!trigger || trigger.contains(event.relatedTarget)) return;
+            cancelTimers();
+            hoverTimer = win.setTimeout(() => open(trigger), 250);
+        });
+        doc.addEventListener('pointerout', event => {
+            if (event.pointerType !== 'mouse') return;
+            const trigger = triggerOf(event.target);
+            if (trigger && !trigger.contains(event.relatedTarget)
+                && !card.contains(event.relatedTarget)) deferClose();
+            if (card.contains(event.target) && !card.contains(event.relatedTarget)
+                && !anchor?.contains(event.relatedTarget)) deferClose();
+        });
+        doc.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || card.hidden) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            close({restoreFocus: card.contains(doc.activeElement)});
+        }, true);
+        win.addEventListener('resize', reposition);
+        win.addEventListener('scroll', reposition, {passive: true});
+        win.visualViewport?.addEventListener('resize', reposition);
+        win.visualViewport?.addEventListener('scroll', reposition);
+        return {
+            close,
+            reanchor() {
+                if (card.hidden) return;
+                const replacement = Array.from(doc.querySelectorAll('button[data-definition-word]'))
+                    .find(button => button.dataset.definitionWord === word);
+                if (!replacement) { close(); return; }
+                anchor = replacement;
+                anchor.setAttribute('aria-expanded', 'true');
+                reposition();
+            },
+        };
     }
     function activeRecord(history, game) {
         const today = history.filter(record => record.day === game.day);
@@ -447,6 +664,10 @@
         let timezoneRegistered = false;
         let leaderboardBusy = false;
         let leaderboardMeasure;
+        const definitions = createDefinitionPopover(doc, (word, requestOptions) => requestApi(
+            serverMode ? win.WordliTelegram.createAuthenticatedFetch(win) : win.fetch.bind(win),
+            '/api/definition', {word}, requestOptions,
+        ));
 
         function fitLeaderboardNames() {
             const table = doc.getElementById('leaderboard-table');
@@ -708,12 +929,13 @@
                 const point = doc.createElement('span');
                 point.className = 'progress-point';
                 point.textContent = item.complete ? '✓' : String(item.number);
-                const word = createProgressWord(doc, item.word);
+                const word = createProgressWord(doc, item.word, {interactive: item.complete});
                 node.setAttribute('aria-label', item.complete ? `${item.number}: ${item.word}, отгадано` : `${item.number}: ещё не отгадано`);
                 node.append(point, word);
                 fragment.appendChild(node);
             }
             doc.getElementById('progress-chain').replaceChildren(fragment);
+            definitions?.reanchor();
         }
         function renderReminder() {
             const toggle = doc.getElementById('reminder-toggle');
@@ -813,6 +1035,7 @@
             finally { leaderboardBusy = false; }
         }
         function showScreen(next) {
+            definitions?.close();
             clearMessage(true);
             if (next !== 'game') stopConfetti();
             if (revealActive) { cancelReveal(); renderBoard(); renderKeyboard(); }
@@ -964,6 +1187,7 @@
         }
         async function closeApplication() {
             if (closing) return;
+            definitions?.close();
             closing = true;
             if (serverMode) {
                 try { await client.flush(); }
@@ -1057,9 +1281,9 @@
         win.addEventListener('focus', () => { if (win.performance.now() - lastRefreshAt > 1000) refresh(); });
         doc.addEventListener('visibilitychange', () => {
             if (doc.visibilityState === 'visible') refresh();
-            else client.flush?.().catch(() => {});
+            else { definitions?.close(); client.flush?.().catch(() => {}); }
         });
-        win.addEventListener('pagehide', () => client.flush?.().catch(() => {}));
+        win.addEventListener('pagehide', () => { definitions?.close(); client.flush?.().catch(() => {}); });
         win.addEventListener('storage', event => {
             if (event.key !== STORAGE_KEY && event.key !== null) return;
             win.clearTimeout(storageTimer);
@@ -1081,6 +1305,7 @@
             LEADERBOARD_NAME_LIMIT, formatLeaderboardName,
             createHistoryStore, preserveStorageWarning, validateState, requestApi, createGameClient, formatStatistics,
             gameIdentity, formatProgressWord, createProgressWord, formatScoreDelta, shouldCelebrate, formatCountdown, mount,
+            validateDefinition, definitionPosition, formatDefinitionMeaning, createDefinitionPopover,
         };
     }
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {

@@ -1,4 +1,4 @@
-"""Изолированный сервер тестовой Mini App с Telegram и тестовой БД."""
+"""Общий HTTP API игры для рабочего и тестового запуска с Telegram."""
 
 from __future__ import annotations
 
@@ -18,10 +18,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from config_data.config import load_config, validate_test_database
 
+from .definitions import DefinitionService
 from .engine import GameError, LocalGameEngine
 from .reminders import parse_reminders_flag, reminder_service
 from .storage import WordliStorage
 from .telegram_auth import MAX_TELEGRAM_USER_ID, validate_init_data
+from .wiktionary import WiktionaryClient
 
 ROOT = Path(__file__).resolve().parent
 MAX_BODY_BYTES = 32768
@@ -38,6 +40,7 @@ API_FIELDS = {
     "/api/state": set(),
     "/api/settings": {"timezone", "reminder_enabled"},
     "/api/leaderboard": set(),
+    "/api/definition": {"word"},
     "/api/guess": {"day", "index", "guess", "revision", "request_id"},
     "/api/next": {"day", "index", "revision", "request_id"},
     "/api/draft": {"day", "index", "draft", "revision"},
@@ -163,6 +166,7 @@ def create_app(
     *,
     mode: str = "test",
     readiness_check: Callable[[], Awaitable[bool]] | None = None,
+    definition_lookup: Callable[[str], Awaitable[dict[str, Any]]] | None = None,
 ) -> web.Application:
     """Создаёт игру с проверкой Telegram и явно выбранным режимом доступа."""
     if mode not in {"test", "production"}:
@@ -196,6 +200,10 @@ def create_app(
     allowed = None if allowed_user_ids is None else frozenset(allowed_user_ids)
     get_time = clock or _utc_now
     public_host = urlsplit(origin).netloc
+    dictionary = WiktionaryClient() if definition_lookup is None else None
+    definitions = DefinitionService(
+        storage, definition_lookup or dictionary.lookup, get_time
+    )
 
     def response_state(state: dict[str, Any]) -> dict[str, Any]:
         """Не выдаёт историю и помечает серверное хранение состояния."""
@@ -240,6 +248,9 @@ def create_app(
                 raise GameError("access_denied", "Игра пока недоступна.", 403)
             user_id = identity.user_id
             payload = await _read_payload(request)
+            if request.path == "/api/definition":
+                # Определение не является игровым состоянием и не меняет профиль.
+                return _json_response(await definitions.get(user_id, payload["word"]))
             if request.path == "/api/state":
                 state = await storage.bootstrap(user_id)
                 state["settings"] = await storage.settings(
@@ -358,6 +369,12 @@ def create_app(
 
     app = web.Application(client_max_size=MAX_BODY_BYTES + 1)
     app.router.add_route("*", "/{path:.*}", handle)
+    if dictionary is not None:
+        async def close_dictionary(application: web.Application) -> None:
+            """Закрывает только принадлежащую приложению словарную сессию."""
+            await dictionary.close()
+
+        app.on_cleanup.append(close_dictionary)
     return app
 
 

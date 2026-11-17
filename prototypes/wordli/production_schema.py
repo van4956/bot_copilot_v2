@@ -135,7 +135,8 @@ async def assert_runtime_permissions(engine: AsyncEngine) -> None:
                 "and c.relkind in ('r','p','v','m','f') "
                 "and c.oid not in (cast('wordli_profiles' as regclass), "
                 "cast('wordli_requests' as regclass), "
-                "cast('wordli_settings' as regclass)) "
+                "cast('wordli_settings' as regclass), "
+                "cast('wordli_definitions' as regclass)) "
                 "and has_table_privilege(c.oid, "
                 "'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'))"
             )

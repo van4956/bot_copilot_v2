@@ -47,6 +47,7 @@ from .engine import (
     GameError,
     LocalGameEngine,
     normalize_draft,
+    normalize_word,
 )
 
 wordli_metadata = MetaData()
@@ -87,6 +88,14 @@ settings_table = Table(
         autoincrement=False,
     ),
     Column("data", JSON, nullable=False),
+)
+definitions_table = Table(
+    "wordli_definitions",
+    wordli_metadata,
+    Column("word", String(5), primary_key=True),
+    Column("data", JSON, nullable=False),
+    Column("checked_at", BigInteger, nullable=False),
+    Column("retry_after", BigInteger, nullable=False),
 )
 DEFAULT_TIMEZONE = "Etc/GMT-4"
 MAX_REMINDER_ATTEMPTS = 3
@@ -227,6 +236,62 @@ class WordliStorage:
         """Создаёт только самостоятельные таблицы Wordli."""
         async with self._database.begin() as connection:
             await connection.run_sync(wordli_metadata.create_all)
+
+    async def require_won_word(self, user_id: int, value: str) -> str:
+        """Разрешает только отгаданное слово без записи и создания профиля."""
+        _check_user(user_id)
+        word = normalize_word(value)
+        async with self._sessions() as session:
+            profile = (
+                await session.execute(
+                    select(
+                        profiles_table.c.history, profiles_table.c.dictionary_id
+                    ).where(profiles_table.c.user_id == user_id)
+                )
+            ).mappings().one_or_none()
+        if profile is not None:
+            # migrate_history здесь — чистая проверка копии, а не миграция БД.
+            records = self._rules.migrate_history(
+                profile["history"], profile["dictionary_id"], self._today()
+            )
+            if any(
+                record["answer"] == word
+                and record["guesses"]
+                and record["guesses"][-1] == word
+                for record in records
+            ):
+                return word
+        raise GameError(
+            "word_not_revealed", "Значение доступно после отгадывания слова.", 403
+        )
+
+    async def definition_cache(self, word: str) -> dict[str, Any] | None:
+        """Читает общее определение, не обращаясь к игровому профилю."""
+        async with self._sessions() as session:
+            row = (
+                await session.execute(
+                    select(definitions_table).where(definitions_table.c.word == word)
+                )
+            ).mappings().one_or_none()
+        return dict(row) if row is not None else None
+
+    async def save_definition_cache(
+        self,
+        word: str,
+        data: dict[str, Any],
+        checked_at: int,
+        retry_after: int = 0,
+    ) -> None:
+        """Обновляет только отдельный кэш вне игровых транзакций."""
+        insert = pg_insert if self._dialect == "postgresql" else sqlite_insert
+        values = {"data": data, "checked_at": checked_at, "retry_after": retry_after}
+        query = insert(definitions_table).values(word=word, **values)
+        async with self._sessions.begin() as session:
+            await session.execute(
+                query.on_conflict_do_update(
+                    index_elements=[definitions_table.c.word], set_=values
+                )
+            )
 
     async def user_locale(self, user_id: int) -> str:
         """Читает язык бота без создания профиля или изменения его настроек."""
