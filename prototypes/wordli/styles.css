@@ -673,7 +673,7 @@ button:focus-visible {
 .definition-meanings {
   list-style: none;
   font-size: 13px;
-  font-style: italic;
+  font-style: normal;
 }
 
 .definition-source {
