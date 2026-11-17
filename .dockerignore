@@ -24,6 +24,7 @@ wheels/
 .env
 .env.*.local
 .test-data/
+.dev-local/
 .playwright-mcp/
 .tools/
 .playwright-mcp/
