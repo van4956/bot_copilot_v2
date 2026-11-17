@@ -64,7 +64,7 @@ def resolve_recipe_photo(
         if not test_mode or number not in {"1", "2", "3", "4", "5"}:
             raise ValueError("Тестовое изображение запрещено в этом режиме")
         path = (
-            PROJECT_ROOT / "testing" / "fixtures" / "images"
+            PROJECT_ROOT / "local_testing" / "testing" / "fixtures" / "images"
             / f"test_image_{number}.png"
         )
         if not path.is_file():

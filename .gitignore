@@ -1,4 +1,5 @@
 .env
+/local_testing/
 .env.*.local
 .test-data/
 .dev-local/

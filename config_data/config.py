@@ -77,7 +77,7 @@ def validate_test_database(url: str) -> None:
         if parsed.database == ":memory:":
             return
         path = Path(parsed.database or "").resolve()
-        if ROOT / ".test-data" in path.parents:
+        if ROOT / "local_testing" / "data" in path.parents:
             return
     elif (
         parsed.drivername == "postgresql+asyncpg"
@@ -146,7 +146,9 @@ def load_config(path: str | None = None) -> Config:
     if mode not in {"test", "production"}:
         raise ValueError("APP_ENV должен быть test или production")
     filename = path or os.getenv("APP_ENV_FILE")
-    filename = filename or str(ROOT / (".env.test.local" if mode == "test" else ".env"))
+    filename = filename or str(
+        ROOT / "local_testing" / ".env.test.local" if mode == "test" else ROOT / ".env"
+    )
     values = {
         key: value
         for key, value in dotenv_values(filename).items()
@@ -163,7 +165,7 @@ def load_config(path: str | None = None) -> Config:
     database_url = (
         values.get(
             "TEST_DATABASE_URL",
-            f"sqlite+aiosqlite:///{ROOT / '.test-data' / 'copilot_review.sqlite3'}",
+            f"sqlite+aiosqlite:///{ROOT / 'local_testing' / 'data' / 'copilot_review.sqlite3'}",
         )
         if test
         else values.get("DB_POST", "")

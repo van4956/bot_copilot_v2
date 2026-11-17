@@ -21,6 +21,7 @@ wheels/
 *.egg
 
 # Environments and configs
+/local_testing/
 .env
 .env.*.local
 .test-data/

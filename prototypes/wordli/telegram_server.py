@@ -374,7 +374,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Тестовая Telegram-игра")
     parser.add_argument("--port", type=int, default=8770)
     parser.add_argument("--public-origin", required=True)
-    parser.add_argument("--env-file", default=".env.test.local")
+    parser.add_argument("--env-file", default="local_testing/.env.test.local")
     args = parser.parse_args()
     if os.getenv("APP_ENV", "test").lower() != "test":
         parser.error("Сервер игры разрешён только при APP_ENV=test")

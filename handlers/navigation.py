@@ -30,7 +30,7 @@ navigation_router = Router()
 navigation_router.message.filter(ChatTypeFilter("private"))
 navigation_router.callback_query.filter(F.message.chat.type == "private")
 WORDLI_EMOJI_CAPTURE_PATH = (
-    ROOT / ".test-data/wordli-runtime/custom-emoji.json"
+    ROOT / "local_testing/data/wordli-runtime/custom-emoji.json"
 )
 DISABLED_MINIAPP_CALLBACKS = {
     "service_miniapp",
