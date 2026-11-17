@@ -1,5 +1,6 @@
 .env
 /local_testing/
+/docker/local_testing/
 .env.*.local
 .test-data/
 .dev-local/

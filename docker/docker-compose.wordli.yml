@@ -3,11 +3,11 @@ name: copilot-wordli
 services:
   wordliapi:
     build:
-      context: .
-      dockerfile: Dockerfile.wordli
+      context: ..
+      dockerfile: docker/Dockerfile.wordli
     image: copilot-wordli:${WORDLI_IMAGE_TAG:-local}
     env_file:
-      - ${WORDLI_ENV_FILE:-.env.wordli.local}
+      - ${WORDLI_ENV_FILE:-../.env.wordli.local}
     environment:
       APP_ENV: production
       PYTHONDONTWRITEBYTECODE: "1"

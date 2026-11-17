@@ -1,6 +1,10 @@
+name: bot_04_copilot_v2
+
 services:
   bot:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: container_bot
     user: "10001:10001"
     read_only: true

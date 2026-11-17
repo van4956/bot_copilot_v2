@@ -1,0 +1,33 @@
+Docker-конфигурация Copilot
+
+Все команды запускаются из корня проекта, не из docker/.
+Перенос файлов сам по себе не запускает и не перезапускает контейнеры.
+
+Рабочие проекты и ресурсы сохраняют прежние имена:
+- bot_04_copilot_v2: bot, db, redis; тома postgres_data и redis_data.
+- copilot-wordli: только wordliapi.
+- сети bot_copilot_net и bot_copilot_backend не переименовываются.
+
+Проверка конфигурации без запуска:
+docker compose --env-file .env -f docker/docker-compose.yml config --quiet
+
+Рабочие секреты не перемещаются: .env остаётся в корне проекта;
+на VPS настройки игры остаются в /etc/copilot/wordli.env.
+Для игры WORDLI_ENV_FILE должен содержать абсолютный путь к выбранному env.
+Пример проверки игры на VPS (Bash):
+WORDLI_ENV_FILE=/etc/copilot/wordli.env docker compose --env-file /etc/copilot/wordli.env -f docker/docker-compose.wordli.yml config --quiet
+
+Сборка из корня проекта при отдельно согласованном выпуске:
+docker build -f docker/Dockerfile -t copilot-bot:RELEASE .
+docker build -f docker/Dockerfile.wordli -t copilot-wordli:RELEASE .
+
+Контекст сборки — корень репозитория. Для каждого production Dockerfile
+его собственный .dockerignore лежит рядом с ним в docker/.
+local_testing/ и docker/local_testing/ исключены из рабочих образов.
+Не добавляйте --project-directory без отдельного пересчёта относительных путей:
+compose build.context рассчитан относительно каталога docker/.
+
+Тестовые Docker-конфиги размещаются отдельно в docker/local_testing/.
+Пользовательские тестовые данные и инструменты остаются в local_testing/.
+Не запускайте production Compose для локальных тестов.
+Не выполняйте down -v и не пересоздавайте БД ради переноса файлов.

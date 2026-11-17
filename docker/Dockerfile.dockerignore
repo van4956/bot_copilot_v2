@@ -22,8 +22,7 @@ wheels/
 
 # Environments and configs
 /local_testing/
-.env
-.env.*.local
+.env*
 .test-data/
 .dev-local/
 .playwright-mcp/
@@ -87,3 +86,6 @@ tests/
 
 # Атрибуция словаря должна сопровождать данные в образе Wordli.
 !prototypes/wordli/data/*.md
+
+# Локальные тестовые Docker-конфиги не входят в рабочие образы.
+/docker/local_testing/

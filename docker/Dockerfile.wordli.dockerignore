@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environments and configs
+/local_testing/
+.env*
+.test-data/
+.dev-local/
+.playwright-mcp/
+.tools/
+.playwright-mcp/
+.ruff_cache/
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+.venv
+env/
+venv/
+ENV/
+.env.example
+*.env.*
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+.docker/
+
+# Database data directories
+database/postgres/
+database/influxdb/
+database/grafana/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs and temp
+logs/
+*.log
+*.bak
+*.swp
+*.tmp
+.mypy_cache/
+.pytest_cache/
+.coverage
+.tox/
+.nox/
+
+# Documentation
+*.md
+LICENSE
+prescription.txt
+bot_04_copilot_v2_contents.txt
+
+# Testing
+testing/
+tests/
+
+# Атрибуция словаря должна сопровождать данные в образе Wordli.
+!prototypes/wordli/data/*.md
+
+# Локальные тестовые Docker-конфиги не входят в рабочие образы.
+/docker/local_testing/

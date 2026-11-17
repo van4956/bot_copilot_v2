@@ -16,7 +16,7 @@ Telegram → https://copilot-games-v4956.duckdns.org
 - HTML/CSS/JS и API находятся на одном origin, без CORS и GitHub Pages.
 - `production_server` — HTTP-сервер, а не второй polling основного бота.
 - HTTPS-proxy управляется отдельно от приложения. Он не открывает порт БД.
-- `docker-compose.wordli.yml` содержит только игру. Не объединять его
+- `docker/docker-compose.wordli.yml` содержит только игру. Не объединять его
   запуск с безусловным `up`, `down` или `restart` всего основного Compose.
 - В рабочей БД используются только `wordli_profiles`, `wordli_requests`
   и `wordli_settings` (публичное имя, часовой пояс, добровольные напоминания).
@@ -27,7 +27,7 @@ Telegram → https://copilot-games-v4956.duckdns.org
 
 ## Образ и зависимости
 
-`Dockerfile.wordli` копирует только игровую папку и конфигурационный модуль,
+`docker/Dockerfile.wordli` копирует только игровую папку и конфигурационный модуль,
 не устанавливает aiogram, numpy и инструменты подготовки словаря.
 `requirements-wordli.txt` отдельно фиксирует HTTP-зависимости, включая
 `aiohttp==3.14.5`. Основной бот остаётся на собственном requirements.
@@ -97,7 +97,7 @@ env-файле. Пример явного одноразового запуск�
 ```bash
 WORDLI_ENV_FILE=/etc/copilot/wordli-migration.env \
 docker compose --env-file /etc/copilot/wordli-migration.env \
-  -f docker-compose.wordli.yml run --rm --no-deps --entrypoint python \
+  -f docker/docker-compose.wordli.yml run --rm --no-deps --entrypoint python \
   wordliapi -m prototypes.wordli.production_schema --apply
 ```
 
@@ -134,7 +134,7 @@ Copilot. Отдельный сервис игры подключается к н
 ```bash
 WORDLI_ENV_FILE=/etc/copilot/wordli.env \
 docker compose --env-file /etc/copilot/wordli.env \
-  -f docker-compose.wordli.yml up -d --no-deps wordliapi
+  -f docker/docker-compose.wordli.yml up -d --no-deps wordliapi
 ```
 
 Healthcheck подтверждает production-режим и реальное соединение с БД.
@@ -166,13 +166,13 @@ Healthcheck подтверждает production-режим и реальное �
 
 ## Тестовая production-сборка
 
-`Dockerfile.wordli.test` добавляет pytest к изолированному игровому образу.
-Выбранные независимые Wordli-тесты находятся в `qa_tests`; проектный
+`docker/local_testing/Dockerfile.wordli.test` добавляет pytest к изолированному игровому образу.
+Выбранные независимые Wordli-тесты находятся в `local_testing/tests`; проектный
 conftest, импортирующий aiogram с другим диапазоном aiohttp, не копируется.
 Отдельная фикстура запрещает внешние HTTP и DNS-запросы.
 
 Для проверки БД используется новый проект `wordli-production-review` из
-`docker-compose.wordli.test.yml`, без host-портов и без подключения к
+`docker/local_testing/docker-compose.wordli.test.yml`, без host-портов и без подключения к
 существующим контейнерам тестового или основного бота. PostgreSQL находится
 в собственном tmpfs, база строго `copilot_review_test`. Две новые случайные
 hex-строки задаются только в игнорируемом env-файле:
@@ -183,13 +183,13 @@ WORDLI_QA_APP_PASSWORD=ANOTHER_NEW_RANDOM_HEX_FOR_THIS_TEST_ONLY
 ```
 
 ```bash
-docker build -f Dockerfile.wordli -t copilot-wordli:local .
-docker compose --env-file .test-data/wordli-production-review.env \
-  -f docker-compose.wordli.test.yml build qa
-docker compose --env-file .test-data/wordli-production-review.env \
-  -f docker-compose.wordli.test.yml up -d --wait db-test
-docker compose --env-file .test-data/wordli-production-review.env \
-  -f docker-compose.wordli.test.yml run --rm --no-deps qa
+docker build -f docker/Dockerfile.wordli -t copilot-wordli:local .
+docker compose --env-file local_testing/.env.test.local \
+  -f docker/local_testing/docker-compose.wordli.test.yml build qa
+docker compose --env-file local_testing/.env.test.local \
+  -f docker/local_testing/docker-compose.wordli.test.yml up -d --wait db-test
+docker compose --env-file local_testing/.env.test.local \
+  -f docker/local_testing/docker-compose.wordli.test.yml run --rm --no-deps qa
 ```
 
 Интеграционные тесты создают только собственные UUID-схемы. Отдельный тест
