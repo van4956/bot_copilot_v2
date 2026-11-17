@@ -18,12 +18,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from config_data.config import load_config, validate_test_database
 
-from .definitions import DefinitionService
+from .definitions import DefinitionService, StaticDefinitionCatalog
 from .engine import GameError, LocalGameEngine
 from .reminders import parse_reminders_flag, reminder_service
 from .storage import WordliStorage
 from .telegram_auth import MAX_TELEGRAM_USER_ID, validate_init_data
-from .wiktionary import WiktionaryClient
 
 ROOT = Path(__file__).resolve().parent
 MAX_BODY_BYTES = 32768
@@ -166,7 +165,7 @@ def create_app(
     *,
     mode: str = "test",
     readiness_check: Callable[[], Awaitable[bool]] | None = None,
-    definition_lookup: Callable[[str], Awaitable[dict[str, Any]]] | None = None,
+    definition_catalog: StaticDefinitionCatalog | None = None,
 ) -> web.Application:
     """Создаёт игру с проверкой Telegram и явно выбранным режимом доступа."""
     if mode not in {"test", "production"}:
@@ -200,10 +199,8 @@ def create_app(
     allowed = None if allowed_user_ids is None else frozenset(allowed_user_ids)
     get_time = clock or _utc_now
     public_host = urlsplit(origin).netloc
-    dictionary = WiktionaryClient() if definition_lookup is None else None
-    definitions = DefinitionService(
-        storage, definition_lookup or dictionary.lookup, get_time
-    )
+    # Полное покрытие проверяется до открытия порта, без фоновой генерации.
+    definitions = DefinitionService(storage, definition_catalog or StaticDefinitionCatalog())
 
     def response_state(state: dict[str, Any]) -> dict[str, Any]:
         """Не выдаёт историю и помечает серверное хранение состояния."""
@@ -369,12 +366,6 @@ def create_app(
 
     app = web.Application(client_max_size=MAX_BODY_BYTES + 1)
     app.router.add_route("*", "/{path:.*}", handle)
-    if dictionary is not None:
-        async def close_dictionary(application: web.Application) -> None:
-            """Закрывает только принадлежащую приложению словарную сессию."""
-            await dictionary.close()
-
-        app.on_cleanup.append(close_dictionary)
     return app
 
 

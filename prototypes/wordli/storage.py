@@ -89,14 +89,6 @@ settings_table = Table(
     ),
     Column("data", JSON, nullable=False),
 )
-definitions_table = Table(
-    "wordli_definitions",
-    wordli_metadata,
-    Column("word", String(5), primary_key=True),
-    Column("data", JSON, nullable=False),
-    Column("checked_at", BigInteger, nullable=False),
-    Column("retry_after", BigInteger, nullable=False),
-)
 DEFAULT_TIMEZONE = "Etc/GMT-4"
 MAX_REMINDER_ATTEMPTS = 3
 
@@ -264,34 +256,6 @@ class WordliStorage:
         raise GameError(
             "word_not_revealed", "Значение доступно после отгадывания слова.", 403
         )
-
-    async def definition_cache(self, word: str) -> dict[str, Any] | None:
-        """Читает общее определение, не обращаясь к игровому профилю."""
-        async with self._sessions() as session:
-            row = (
-                await session.execute(
-                    select(definitions_table).where(definitions_table.c.word == word)
-                )
-            ).mappings().one_or_none()
-        return dict(row) if row is not None else None
-
-    async def save_definition_cache(
-        self,
-        word: str,
-        data: dict[str, Any],
-        checked_at: int,
-        retry_after: int = 0,
-    ) -> None:
-        """Обновляет только отдельный кэш вне игровых транзакций."""
-        insert = pg_insert if self._dialect == "postgresql" else sqlite_insert
-        values = {"data": data, "checked_at": checked_at, "retry_after": retry_after}
-        query = insert(definitions_table).values(word=word, **values)
-        async with self._sessions.begin() as session:
-            await session.execute(
-                query.on_conflict_do_update(
-                    index_elements=[definitions_table.c.word], set_=values
-                )
-            )
 
     async def user_locale(self, user_id: int) -> str:
         """Читает язык бота без создания профиля или изменения его настроек."""

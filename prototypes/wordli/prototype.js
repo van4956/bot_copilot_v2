@@ -359,7 +359,6 @@
         const status = doc.getElementById('definition-status');
         const meanings = doc.getElementById('definition-meanings');
         const source = doc.getElementById('definition-source');
-        const attribution = doc.getElementById('definition-attribution');
         let anchor = null;
         let word = null;
         let pinned = false;
@@ -413,7 +412,6 @@
                 meanings.appendChild(meaning);
             }
             source.hidden = !result.source_url;
-            attribution.hidden = result.status !== 'found' || !result.source_url;
             if (result.source_url) source.href = result.source_url;
             else source.removeAttribute('href');
             card.setAttribute('aria-busy', 'false');
@@ -433,7 +431,6 @@
             meanings.hidden = true;
             meanings.replaceChildren();
             source.hidden = true;
-            attribution.hidden = true;
             source.removeAttribute('href');
             card.dataset.state = 'loading';
             card.setAttribute('aria-busy', 'true');

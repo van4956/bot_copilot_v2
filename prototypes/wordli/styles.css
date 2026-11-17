@@ -672,20 +672,13 @@ button:focus-visible {
 .definition-status { color: #c2c2c2; }
 .definition-meanings { list-style: none; }
 
-.definition-attribution {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px;
+.definition-source {
+  display: inline-block;
   margin-top: 13px;
   color: #aaaaaa;
   font-size: 12px;
   line-height: 1.4;
-}
-
-.definition-source {
   border-radius: 2px;
-  color: inherit;
   text-decoration: underline;
   text-decoration-color: #777777;
   text-underline-offset: 2px;
