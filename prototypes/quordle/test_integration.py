@@ -7,7 +7,7 @@ import json
 import os
 import time
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -36,13 +36,16 @@ class ApiTest(unittest.IsolatedAsyncioTestCase):
     """Тестирует доступ без настоящего бота и данных пользователей."""
 
     async def test_authorisation_origin_and_word_rights(self) -> None:
-        """Блокирует неподписанные запросы и определения проигранных слов."""
+        """Проверяет допуск игрока и доступ к определению текущего итога."""
         token = "fixture-token"
         storage = AsyncMock()
         storage.operate.return_value = {"revision": 1}
         storage.get_definition_permission.return_value = False
+        catalog = Mock()
+        catalog.lookup.return_value = {"definitions": ["Пояснение слова."]}
         app = create_app(
-            storage, None, origin="https://quordle.test", token=token, allowed={123}
+            storage, catalog, origin="https://quordle.test",
+            token=token, allowed={123},
         )
         async with TestClient(TestServer(app)) as client:
             host = {"Host": "quordle.test"}
@@ -62,6 +65,16 @@ class ApiTest(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(response.status, 403)
             self.assertEqual((await response.json())["error"], "word_not_revealed")
+            catalog.lookup.assert_not_called()
+            storage.get_definition_permission.return_value = True
+            response = await client.post(
+                "/api/definition", json={"word": "парус"}, headers=signed
+            )
+            self.assertEqual(response.status, 200)
+            card = await response.json()
+            self.assertEqual(card["definition"], "Пояснение слова.")
+            storage.get_definition_permission.assert_awaited_with(123, "ПАРУС")
+            catalog.lookup.assert_called_once_with("ПАРУС")
             response = await client.get("/storage.py")
             self.assertEqual(response.status, 404)
 
@@ -149,8 +162,11 @@ class DatabaseTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["stats"]["played"], 1)
         self.assertEqual(state["stats"]["wins"], 0)
         self.assertEqual(state["stats"]["solved_words"], 3)
-        self.assertTrue(await self.storage.get_definition_permission(player.user_id, answers[2]))
-        self.assertFalse(await self.storage.get_definition_permission(player.user_id, answers[3]))
+        can_define = self.storage.get_definition_permission
+        for board in game["boards"]:
+            self.assertTrue(await can_define(player.user_id, board["answer"]))
+        self.assertFalse(await can_define(player.user_id, filler))
         new = await operate(player, "next", {"revision": state["revision"]})
         self.assertEqual(new["game"]["attempts"], 0)
-        self.assertFalse(await self.storage.get_definition_permission(player.user_id, answers[2]))
+        for answer in answers:
+            self.assertFalse(await can_define(player.user_id, answer))

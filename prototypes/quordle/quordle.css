@@ -568,7 +568,7 @@ button:focus-visible {
   padding: 18px 20px 16px;
   overflow: auto;
   overscroll-behavior: contain;
-  border: 1px solid #494949;
+  border: 0;
   border-radius: 16px;
   background: #303030;
   color: var(--text);
@@ -812,7 +812,7 @@ body[data-screen="game"] .app-shell {
 .wordmark span { flex-shrink: 1; min-width: 0; }
 .header-actions { flex-shrink: 0; }
 .screen--game { flex: 1 1 0; min-height: 0; justify-content: flex-start; gap: 0; }
-#status-line { color: var(--muted); font-size: 13px; text-align: center;
+#loading-status { color: var(--muted); font-size: 13px; text-align: center;
   line-height: 1.4; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
 .board-space { display: flex; width: 100%; flex: 1 1 0; overflow-y: auto; min-height: 0; container-type: size; }
 #boards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; align-content: center;
@@ -838,22 +838,15 @@ body[data-screen="game"] .app-shell {
 .key-sectors i[data-color=correct] { background: var(--yellow); }
 .key-sectors i[data-color=present] { background: var(--white); }
 .key-sectors i[data-color=absent] { background: var(--tile-absent); }
-.key-sectors i[data-color=solved] { background: #39393b; }
 .key[data-ink="dark"] .key-letter { color: #262626; }
 .key[data-ink="mixed"] .key-letter { text-shadow: -1px -1px 0 #252525, 1px -1px 0 #252525, -1px 1px 0 #252525, 1px 1px 0 #252525; }
 .key:disabled { cursor: default; }
 .result-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 36px 0 32px; }
-.result-card { min-height: 56px; border: 1px solid #3a3a3a; border-radius: 14px; display: flex; justify-content: center; align-items: center; gap: 7px;
-  padding: 12px 6px; background: var(--tile-empty); color: #c2c2c2; font-size: clamp(16px, 4.2vw, 20px); line-height: 1.25; }
-button.result-card { border-color: var(--yellow); background: var(--yellow); color: #242424; font-weight: 500; }
+.result-card { min-height: 56px; border: 0; border-radius: 26px; display: flex; justify-content: center; align-items: center; gap: 7px;
+  padding: 12px 6px; background: var(--surface); color: #c2c2c2; font-size: clamp(16px, 4.2vw, 20px); line-height: 1.25; }
+.result-card--solved { background: var(--yellow); color: #242424; font-weight: 500; }
 button.result-card:active { filter: brightness(.9); }
-button.result-card[aria-expanded="true"] .result-word,
-button.result-card:focus-visible .result-word { text-decoration: underline; text-underline-offset: 3px; }
 .result-check svg { display: block; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.attempts-card .round-score { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 14px 0 0; }
-.stats-grid--quordle { grid-template-columns: repeat(6,minmax(0,1fr)); }
-.stats-grid--quordle .stat-card { grid-column: span 2; }
-.stats-grid--quordle .stat-card--words { grid-column: span 3; }
 .score-formula { line-height: 1.45; font-variant-numeric: tabular-nums; }
 .leaderboard-label { text-overflow: ellipsis; }
 @media (max-height: 700px) {
@@ -862,7 +855,7 @@ button.result-card:focus-visible .result-word { text-decoration: underline; text
 @media (orientation: landscape) and (max-height: 500px) {
   body[data-screen="game"] .app-shell { width: min(100%, 950px); min-height: 260px; padding-block: 3px; }
   .screen--game { gap: 3px; }
-  #status-line { margin: 0; }
+  #loading-status { margin: 0; }
   .screen--game .keyboard { max-width: 484px; margin-top: 0; --key-height: 27px; gap: 2px; }
   body[data-screen="game"] .app-header { min-height: 26px; margin: 0; }
   body[data-screen="game"] .app-header button { height: 28px; }

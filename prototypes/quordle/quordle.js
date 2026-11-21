@@ -11,7 +11,7 @@
   };
   const sectionNames = ['game', 'stats', 'settings', 'rules', 'formula', 'leaderboard', 'summary', 'closed', 'exhausted'];
   const names = ['верхнее левое', 'верхнее правое', 'нижнее левое', 'нижнее правое'];
-  const colors = {correct: 'на месте', present: 'есть', absent: 'нет', solved: 'поле решено', '': 'неизвестно'};
+  const colors = {correct: 'на месте', present: 'есть', absent: 'нет', '': 'неизвестно'};
   const priority = {'': 0, absent: 1, present: 2, correct: 3};
   const keyElements = new Map();
   // Те же линейные пиктограммы, что на клавиатуре «5БУКВ».
@@ -147,7 +147,8 @@
   }
   function drawKeys(boards) {
     for (const [letter, btn] of keyElements) {
-      const parts = boards.map(b => b.solved ? 'solved' : b.keyboard?.[letter] || '');
+      // После закрытия поля сервер сохраняет подсказки последнего принятого им хода.
+      const parts = boards.map(b => b.keyboard?.[letter] || '');
       const lightParts = parts.filter(p => p === 'present' || p === 'correct').length;
       btn.dataset.ink = lightParts === 4 ? 'dark' : lightParts ? 'mixed' : 'light';
       Array.from(btn.firstElementChild.children).forEach((part, i) => { part.dataset.color = parts[i]; });
@@ -158,20 +159,19 @@
     if (!state) return;
     drawBoards();
     drawKeys(state.game.boards);
-    const g = state.game;
-    $('status-line').textContent = (active() ? 'Ход ' + Math.min(9, g.attempts + 1) + ' из 9' : 'Партия завершена')
-      + ' · Угадано ' + g.solved + ' из 4';
     if (screen === 'stats') renderStats();
     if (screen === 'settings') renderSettings();
   }
   async function refresh() {
     apply(await api('state'));
-    invalid = false; $('retry').hidden = true;
+    invalid = false; $('retry').hidden = true; $('loading-status').hidden = true;
     if (['game', 'summary', 'exhausted'].includes(screen)) home();
   }
   async function reload() {
     try { await serialize(refresh); }
-    catch (err) { $('status-line').textContent = err.message; $('retry').hidden = false; notify(err.message); }
+    catch (err) {
+      $('loading-status').textContent = err.message; $('loading-status').hidden = false; $('retry').hidden = false;
+    }
   }
   async function recover(err) {
     if (err.status !== 409) return false;
@@ -281,7 +281,6 @@
       played: stats.played, 'win-rate': Math.round(stats.win_rate) + '%',
       average: stats.average == null ? '—' : stats.average.toLocaleString('ru', {maximumFractionDigits: 2}),
       'win-streak': stats.win_streak, 'max-streak': stats.max_streak, score: stats.score ?? '—',
-      solved: stats.solved_words, wins: stats.wins,
     };
     for (const node of document.querySelectorAll('[data-stat]')) node.textContent = data[node.dataset.stat];
     const delta = document.querySelector('[data-score-delta]');
@@ -361,16 +360,16 @@
     $('result-title').textContent = expired ? 'Игровой день завершён'
       : game.status === 'won' ? 'Все слова отгаданы!' : 'Попытки закончились';
     $('result-text').textContent = 'Отгадано ' + game.solved + ' из 4 слов';
-    $('round-score').textContent = expired
-      ? 'Угаданные слова сохранены. Незавершённая партия не влияет на рейтинг.'
-      : 'Очки за партию: ' + game.result_score;
     $('result-attempt-count').textContent = game.attempts;
     const cards = game.boards.map((b, i) => {
-      const node = el(b.solved ? 'button' : 'div', 'result-card');
-      node.setAttribute('aria-label', names[i] + ': ' + (b.answer || 'ответ скрыт') + (b.solved ? ', угадано, показать определение' : ', не отгадано'));
-      if (b.solved) {
+      const node = el(b.answer ? 'button' : 'div', b.solved ? 'result-card result-card--solved' : 'result-card');
+      node.setAttribute('aria-label', names[i] + ': ' + (b.answer || 'ответ скрыт')
+        + (b.solved ? ', угадано' : ', не отгадано') + (b.answer ? ', показать определение' : ''));
+      if (b.answer) {
         node.type = 'button'; node.dataset.word = b.answer; node.setAttribute('aria-expanded', 'false');
         node.setAttribute('aria-controls', 'definition-popover');
+      }
+      if (b.solved) {
         const check = el('span', 'result-check');
         check.innerHTML = keyIcons['↵']; node.append(check);
       }

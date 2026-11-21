@@ -8,8 +8,8 @@
   <meta name="referrer" content="no-referrer">
   <title>КВОРДЛИ</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="quordle.css?v=2">
-  <script src="quordle.js?v=2" defer></script>
+  <link rel="stylesheet" href="quordle.css?v=3">
+  <script src="quordle.js?v=3" defer></script>
 </head>
 <body data-screen="game">
   <div class="app-shell">
@@ -29,7 +29,7 @@
     </header>
 
     <main id="game-screen" class="screen screen--game" aria-label="Квордли: четыре поля">
-      <div id="status-line" aria-live="polite">Загрузка игры…</div>
+      <div id="loading-status" aria-live="polite">Загрузка игры…</div>
       <button type="button" class="primary-button" data-action="reload" hidden id="retry">Повторить загрузку</button>
       <div class="board-space"><div id="boards" aria-label="Четыре игровых поля"></div></div>
       <div id="keyboard" class="keyboard" role="group" aria-label="Общая клавиатура"></div>
@@ -43,15 +43,13 @@
         <h1 id="stats-title">Статистика</h1>
         <span class="heading-spacer" aria-hidden="true"></span>
       </div>
-      <div class="stats-grid stats-grid--quordle" aria-label="Личная статистика">
+      <div class="stats-grid" aria-label="Личная статистика">
         <article class="stat-card"><strong class="stat-value" data-stat="played">0</strong><span class="stat-label">Всего сыграно</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="win-rate">0%</strong><span class="stat-label">Доля побед</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="average">—</strong><span class="stat-label">Попыток на победу</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="max-streak">0</strong><span class="stat-label">Максимальная серия</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="win-streak">0</strong><span class="stat-label">Текущая серия</span></article>
         <article class="stat-card stat-card--score"><span class="stat-score-number"><strong class="stat-value" data-stat="score">—</strong><span class="stat-score-delta" data-score-delta hidden></span></span><span class="stat-label">Рейтинг</span></article>
-        <article class="stat-card stat-card--words"><strong class="stat-value" data-stat="wins">0</strong><span class="stat-label">Полных побед</span></article>
-        <article class="stat-card stat-card--words"><strong class="stat-value" data-stat="solved">0</strong><span class="stat-label">Отгадано слов</span></article>
       </div>
       <section class="distribution-section" aria-labelledby="distribution-title">
         <h2 id="distribution-title">Распределение попыток</h2>
@@ -136,15 +134,24 @@
         <span class="heading-spacer" aria-hidden="true"></span>
       </div>
       <article class="rules-content">
-        <h2>Четыре слова, девять попыток</h2>
-        <p>Отгадайте четыре разных русских существительных из пяти букв. Один ввод — один общий ход: слово проверяется на каждом ещё не решённом поле.</p>
-        <div class="rules-example" aria-label="Цветные подсказки"><span class="rule-tile rule-tile--correct">А</span><span class="rule-tile rule-tile--present">Б</span><span class="rule-tile rule-tile--absent">В</span></div>
-        <p><b>Жёлтая</b> — буква на месте. <b>Белая</b> — буква есть, но в другом месте. <b>Серая</b> — буквы нет или введён лишний повтор. Сначала проверяются точные совпадения. «Ё» и «Е» равны.</p>
-        <p>Каждая клавиша показывает подсказки для четырёх полей: верхнее левое, верхнее правое, нижнее левое и нижнее правое. После разгадки соответствующая четверть приглушается.</p>
-        <p>Нажмите на ячейку текущего ряда, чтобы заменить букву. Черновик общий, а подсказки уже известных мест — отдельные для каждого слова. Введённое слово можно повторить, но это расходует ход.</p>
-        <p>Победа — только 4 из 4. На девятом ходе сохраняются и частичные результаты. Карточки отгаданных слов открывают их определения, неотгаданные ответы — только для просмотра.</p>
-        <p>Четвёрка персональная. Слова не повторяются в пределах цикла. Если слов для новой четвёрки не хватит, начнётся новый перемешанный цикл. После результата можно сразу играть ещё раз.</p>
-        <p>Игровые сутки сменяются в 00:00 UTC. Брошенная до полуночи партия не считается поражением, но уже отгаданные слова сохраняются.</p>
+        <h2>Правила игры «5 букв»</h2>
+        <p>Каждый день мы загадываем существительное из пяти букв в единственном числе.</p>
+        <p>На разгадку у вас шесть попыток. После каждой попытки цвет букв меняется. Вот что означают цвета.</p>
+        <hr>
+        <div class="rules-example" role="img" aria-label="МЫСЛЬ: М, Л, Ь — белые; Ы, С — серые">
+          <span class="rule-tile rule-tile--present">М</span><span class="rule-tile rule-tile--absent">Ы</span><span class="rule-tile rule-tile--absent">С</span><span class="rule-tile rule-tile--present">Л</span><span class="rule-tile rule-tile--present">Ь</span>
+        </div>
+        <p>Буквы «М», «Л», «Ь» белые — они есть в загаданном слове, но стоят в других местах. Буквы «Ы», «С» серые — их в слове нет.</p>
+        <div class="rules-example" role="img" aria-label="ФИКУС: Ф, И — жёлтые; К, У, С — серые">
+          <span class="rule-tile rule-tile--correct">Ф</span><span class="rule-tile rule-tile--correct">И</span><span class="rule-tile rule-tile--absent">К</span><span class="rule-tile rule-tile--absent">У</span><span class="rule-tile rule-tile--absent">С</span>
+        </div>
+        <p>Буквы «Ф», «И» жёлтые — они есть в загаданном слове и стоят на нужных местах.</p>
+        <div class="rules-example" role="img" aria-label="ФИЛЬМ: все пять букв жёлтые, слово угадано">
+          <span class="rule-tile rule-tile--correct">Ф</span><span class="rule-tile rule-tile--correct">И</span><span class="rule-tile rule-tile--correct">Л</span><span class="rule-tile rule-tile--correct">Ь</span><span class="rule-tile rule-tile--correct">М</span>
+        </div>
+        <p>Когда вы угадаете слово, все буквы окрасятся в жёлтый.</p>
+        <hr>
+        <p>В загаданном слове могут встретиться повторяющиеся буквы, например буква «Т» в слове «Театр». Буквы «Ё» в игре нет, вместо неё используйте «Е» — как в кроссворде.</p>
       </article>
     </section>
 
@@ -156,7 +163,6 @@
       <div id="result-attempts" class="attempts-card">
         <p>Количество попыток:</p>
         <div class="attempts-value"><strong id="result-attempt-count">0</strong><span>/9</span></div>
-        <p id="round-score" class="round-score"></p>
       </div>
     </section>
 

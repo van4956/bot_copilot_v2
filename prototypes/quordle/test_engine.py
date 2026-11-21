@@ -97,7 +97,7 @@ class QuordleEngineTest(unittest.TestCase):
         self.assertEqual(len(next_view["game"]["boards"][0]["rows"]), 2)
 
     def test_partial_loss_and_definition_rights(self) -> None:
-        """После поражения ответы видны, но определения — только отгаданных."""
+        """После поражения все раскрытые ответы кликабельны до новой игры."""
         answers = list(self.answers_now)
         for answer in answers[:3]:
             self.move(answer)
@@ -106,15 +106,33 @@ class QuordleEngineTest(unittest.TestCase):
         game = view["game"]
         self.assertEqual((game["status"], game["result_score"]), ("lost", 30))
         self.assertEqual([b["answer"] for b in game["boards"]], answers)
-        self.assertTrue(self.engine.can_define(self.profile, answers[0], self.day))
-        self.assertFalse(self.engine.can_define(self.profile, answers[3], self.day))
+        for answer in answers:
+            self.assertTrue(self.engine.can_define(self.profile, answer, self.day))
+        self.assertFalse(self.engine.can_define(self.profile, "АРГОН", self.day))
         stats = view["stats"]
         self.assertEqual((stats["played"], stats["solved_words"]), (1, 3))
         self.assertEqual((stats["wins"], stats["average"]), (0, None))
         with self.assertRaises(GameError):
             self.move(answers[3])
         self.engine.next_game(self.profile, self.day)
-        self.assertFalse(self.engine.can_define(self.profile, answers[0], self.day))
+        for answer in answers:
+            self.assertFalse(self.engine.can_define(self.profile, answer, self.day))
+
+    def test_definitions_open_on_win_not_on_active_board(self) -> None:
+        """Даже закрытое поле не открывает справочник посреди игры."""
+        answers = list(self.answers_now)
+        game = self.move(answers[0])["game"]
+        self.assertEqual(game["boards"][0]["answer"], answers[0])
+        for answer in answers:
+            self.assertFalse(self.engine.can_define(self.profile, answer, self.day))
+        for answer in answers[1:]:
+            game = self.move(answer)["game"]
+        self.assertEqual(game["status"], "won")
+        for board in game["boards"]:
+            self.assertTrue(
+                self.engine.can_define(self.profile, board["answer"], self.day)
+            )
+        self.assertFalse(self.engine.can_define(self.profile, "АРГОН", self.day))
 
     def test_real_dictionary_and_independent_players(self) -> None:
         """Второй профиль получает собственные ответы, ходы и историю."""
@@ -165,6 +183,11 @@ class QuordleEngineTest(unittest.TestCase):
             view = self.move("АРГОН")
         self.assertEqual(view["game"]["result_score"], 0)
         self.assertEqual(view["stats"]["score"], 6125)
+        self.assertEqual(view["game"]["solved"], 0)
+        for board in view["game"]["boards"]:
+            self.assertTrue(
+                self.engine.can_define(self.profile, board["answer"], self.day)
+            )
 
     def test_cycle_and_utc_expiry_keep_word_progress(self) -> None:
         """Просрочка не проигрыш; новый полный цикл не обнуляет историю."""
@@ -180,6 +203,8 @@ class QuordleEngineTest(unittest.TestCase):
         self.assertEqual(expired["game"]["status"], "expired")
         self.assertIsNone(expired["game"]["result_score"])
         self.assertTrue(self.engine.can_define(self.profile, solved, tomorrow))
+        for answer in self.answers_now[1:]:
+            self.assertFalse(self.engine.can_define(self.profile, answer, tomorrow))
         self.day = tomorrow
         self.assertEqual(self.engine.bootstrap(self.profile, self.day), expired)
         self.assertEqual(

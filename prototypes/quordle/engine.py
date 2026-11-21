@@ -50,6 +50,11 @@ def _status(record: Record, solved: int, day: date) -> str:
     return "expired" if record["day"] < day.isoformat() else "in_progress"
 
 
+def _answer_revealed(status: str, solved: bool) -> bool:
+    """Проверяет, раскрыт ли ответ этого поля в публичном состоянии."""
+    return solved or status in {"won", "lost"}
+
+
 def _points(status: str, solved: int, attempts: int) -> int | None:
     """Оценивает только завершённую партию."""
     if status == "won":
@@ -198,16 +203,18 @@ class QuordleEngine:
     def can_define(
         self, profile: Profile, word: str, today: date | None = None,
     ) -> bool:
-        """Разрешает определение отгаданного слова текущего итога."""
+        """Разрешает определения раскрытых ответов только на текущем итоге."""
         value = normalize_word(word)
         history = profile.get("history")
         if not history:
             return False
         record = history[-1]
         found = _found(record)
+        status = _status(record, len(found), _today(today))
         return (
-            _status(record, len(found), _today(today)) != "in_progress"
-            and value in found
+            status != "in_progress"
+            and value in record["answers"]
+            and _answer_revealed(status, value in found)
         )
 
     def stats(self, profile: Profile, today: date | None = None) -> dict:
@@ -276,7 +283,7 @@ class QuordleEngine:
                         keyboard.get(letter, ""), 0
                     ):
                         keyboard[letter] = state
-            revealed = solved_at is not None or status in {"won", "lost"}
+            revealed = _answer_revealed(status, solved_at is not None)
             boards.append({
                 "solved": solved_at is not None, "solved_at": solved_at,
                 "rows": rows, "keyboard": keyboard,

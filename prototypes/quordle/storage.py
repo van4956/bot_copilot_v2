@@ -159,7 +159,7 @@ class Storage:
             return state | {"revision": revision, "settings": settings}
 
     async def get_definition_permission(self, user_id: int, word: str) -> bool:
-        """Разрешает определения только для разгаданных слов текущего результата."""
+        """Проверяет доступ к раскрытому ответу текущего результата игрока."""
         game_data = await self.pool.fetchval(
             "select game_data from quordle_players where user_id = $1",
             user_id,

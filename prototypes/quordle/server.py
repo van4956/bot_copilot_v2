@@ -172,7 +172,9 @@ def create_app(
                 word = normalize_word(payload.get("word"))
                 if not await storage.get_definition_permission(player.user_id, word):
                     raise GameError(
-                        "word_not_revealed", "Сначала отгадайте это слово.", 403
+                        "word_not_revealed",
+                        "Определение доступно только для слов на экране результата.",
+                        403,
                     )
                 result = catalog.lookup(word)
                 result["definition"] = result["definitions"][0]
