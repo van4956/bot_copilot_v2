@@ -99,7 +99,7 @@ def load_isolated_config(token: str, expected: int) -> Config:
     )
 
 
-async def run(quordle: str, check_only: bool) -> None:
+async def run(quordle: str, check_only: bool, seed_cookbook: bool = False) -> None:
     """Подтверждает имя и запускает неизменённые роутеры Copilot."""
     token, expected, users = load_test_identity()
     config = load_isolated_config(token, expected)
@@ -115,18 +115,29 @@ async def run(quordle: str, check_only: bool) -> None:
         return
 
     from local_testing.testing.local_bootstrap import configure_local_fixtures
+    from .demo_recipes import seed_demo_recipes
+    from .test_currency_source import ATTRIBUTION_HTML, get_currency_rate
+    from .test_weather_source import fetch_test_weather
 
     configure_local_fixtures()
+    if seed_cookbook:
+        count = await seed_demo_recipes(config)
+        print(f"Добавлено учебных рецептов: {count}.", flush=True)
     navigation.navigation_router.message.register(
         navigation.open_words, Command("quordle"), F.from_user.id.in_(users)
     )
     menu = TwoGamesMenu(wordli, quordle, users)
 
     async def install_menu(bot: Bot) -> None:
-        """Подключает разметку при старте штатного Dispatcher."""
+        """Подключает меню и тестовые источники без обязательных ключей."""
         if getattr(bot, "test_mode", False) is not True or bot.id != expected:
             raise DemoError("Переопределение разрешено только в локальном тесте.")
         bot.session.middleware(menu)
+        if not config.tg_bot.api_weather:
+            bot.weather_provider = fetch_test_weather
+        if not config.tg_bot.api_currency:
+            bot.currency_provider = get_currency_rate
+            bot.currency_attribution = ATTRIBUTION_HTML
 
     navigation.navigation_router.startup.register(install_menu)
     print(f"Тестовый бот @{USERNAME} подтверждён; запуск полного Copilot.", flush=True)
@@ -138,10 +149,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", required=True, help="HTTPS-туннель КВОРДЛИ.")
     parser.add_argument("--check-only", action="store_true")
+    parser.add_argument(
+        "--seed-cookbook", action="store_true",
+        help="Добавить учебные рецепты в пустую тестовую книгу.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     try:
-        asyncio.run(run(_test_url(args.url), args.check_only))
+        asyncio.run(run(_test_url(args.url), args.check_only, args.seed_cookbook))
     except KeyboardInterrupt:
         return 0
     except DemoError as error:

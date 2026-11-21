@@ -11,7 +11,7 @@ from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message
+from aiogram.types import LinkPreviewOptions, Message
 from aiogram.utils.i18n import gettext as _
 from aiogram.utils.i18n import lazy_gettext as __
 
@@ -234,10 +234,11 @@ def _numeric_row(
     """Выравнивает только температуру, оставляя остальное обычным текстом."""
     temperature, humidity, wind, direction, _ = values
     unit = "°C" if current else "°"
+    wind_separator = " | " if current else "  "
     width = len(temperature) if temperature_width is None else temperature_width
     return (
         f"<code>{temperature:>{width}}{unit}</code> | "
-        f"{humidity}% | {wind}𝑣 | {direction}"
+        f"{humidity}% | {wind}𝑣{wind_separator}{direction}"
     )
 
 
@@ -339,7 +340,8 @@ async def _show_forecast(
     """Показывает три дня и возвращает главную даже при отказе погодного API."""
     data = await state.get_data()
     await reset_dialog(state)
-    weather_info = await parse_weather_data(
+    provider = getattr(message.bot, "weather_provider", None)
+    weather_info = await (provider or parse_weather_data)(
         2,
         city=location.get("city"),
         lat=location.get("lat"),
@@ -348,7 +350,14 @@ async def _show_forecast(
         api_key=getattr(message.bot, "api_weather", ""),
         session=getattr(message.bot, "http_session", None),
     )
-    await message.answer(weather_info, parse_mode=ParseMode.HTML)
+    if provider is None:
+        await message.answer(weather_info, parse_mode=ParseMode.HTML)
+    else:
+        await message.answer(
+            weather_info,
+            parse_mode=ParseMode.HTML,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
     await open_main(message, state)
 
 

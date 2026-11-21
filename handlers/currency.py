@@ -11,7 +11,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, LinkPreviewOptions, Message
 from aiogram.utils.i18n import gettext as _
 from aiogram.utils.i18n import lazy_gettext as __
 
@@ -269,7 +269,8 @@ async def process_target_currency(
     try:
         data = await state.get_data()
         base, target = data["currency_base"], callback.data
-        time, date, rate = await get_currency_rate(
+        provider = getattr(callback.bot, "currency_provider", None) or get_currency_rate
+        time, date, rate = await provider(
             base,
             target,
             api_key=getattr(callback.bot, "api_currency", ""),
@@ -277,18 +278,20 @@ async def process_target_currency(
         )
         amount = Decimal(data["currency_amount"])
         count = (amount * rate).quantize(Decimal("0.01"))
-        await callback.message.edit_text(
-            _(
-                "Сумма операции: {amount}\nБазовая валюта: {base}\nЦелевая валюта: {target}\n\n<i>{dt},  {time}</i>\n\n<b>{amount} {base}  ~  {count} {target}</b>"
-            ).format(
-                amount=amount,
-                base=base,
-                target=target,
-                count=count,
-                dt=date,
-                time=time,
-            )
+        result = _(
+            "Сумма операции: {amount}\nБазовая валюта: {base}\nЦелевая валюта: {target}\n\n<i>{dt},  {time}</i>\n\n<b>{amount} {base}  ~  {count} {target}</b>"
+        ).format(
+            amount=amount, base=base, target=target,
+            count=count, dt=date, time=time,
         )
+        attribution = getattr(callback.bot, "currency_attribution", None)
+        if attribution:
+            await callback.message.edit_text(
+                f"{result}\n\n{attribution}",
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
+            )
+        else:
+            await callback.message.edit_text(result)
         await callback.answer(_("Успех"))
     except (ExternalServiceError, KeyError, InvalidOperation):
         await callback.message.edit_text(_("Сервис валют временно недоступен"))
