@@ -8,8 +8,8 @@
   <meta name="referrer" content="no-referrer">
   <title>КВОРДЛИ</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="quordle.css">
-  <script src="quordle.js" defer></script>
+  <link rel="stylesheet" href="quordle.css?v=2">
+  <script src="quordle.js?v=2" defer></script>
 </head>
 <body data-screen="game">
   <div class="app-shell">
@@ -43,15 +43,15 @@
         <h1 id="stats-title">Статистика</h1>
         <span class="heading-spacer" aria-hidden="true"></span>
       </div>
-      <div class="stats-grid" aria-label="Личная статистика">
+      <div class="stats-grid stats-grid--quordle" aria-label="Личная статистика">
         <article class="stat-card"><strong class="stat-value" data-stat="played">0</strong><span class="stat-label">Всего сыграно</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="win-rate">0%</strong><span class="stat-label">Доля побед</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="average">—</strong><span class="stat-label">Попыток на победу</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="max-streak">0</strong><span class="stat-label">Максимальная серия</span></article>
         <article class="stat-card"><strong class="stat-value" data-stat="win-streak">0</strong><span class="stat-label">Текущая серия</span></article>
         <article class="stat-card stat-card--score"><span class="stat-score-number"><strong class="stat-value" data-stat="score">—</strong><span class="stat-score-delta" data-score-delta hidden></span></span><span class="stat-label">Рейтинг</span></article>
-        <article class="stat-card"><strong class="stat-value" data-stat="wins">0</strong><span class="stat-label">Полных побед</span></article>
-        <article class="stat-card"><strong class="stat-value" data-stat="solved">0</strong><span class="stat-label">Отгадано слов</span></article>
+        <article class="stat-card stat-card--words"><strong class="stat-value" data-stat="wins">0</strong><span class="stat-label">Полных побед</span></article>
+        <article class="stat-card stat-card--words"><strong class="stat-value" data-stat="solved">0</strong><span class="stat-label">Отгадано слов</span></article>
       </div>
       <section class="distribution-section" aria-labelledby="distribution-title">
         <h2 id="distribution-title">Распределение попыток</h2>
@@ -151,11 +151,12 @@
     <section id="summary-screen" class="screen screen--summary" aria-labelledby="result-title" hidden>
       <h1 id="result-title" class="summary-title"></h1>
       <p id="result-text" class="summary-text"></p>
-      <div id="result-cards" class="result-cards" aria-label="Итоги четырёх полей"></div><p id="round-score" class="round-score"></p>
+      <div id="result-cards" class="result-cards" role="group" aria-label="Итоги четырёх полей"></div>
       <button class="primary-button replay-button" type="button" data-action="next-game">Играть ещё раз</button>
       <div id="result-attempts" class="attempts-card">
         <p>Количество попыток:</p>
         <div class="attempts-value"><strong id="result-attempt-count">0</strong><span>/9</span></div>
+        <p id="round-score" class="round-score"></p>
       </div>
     </section>
 

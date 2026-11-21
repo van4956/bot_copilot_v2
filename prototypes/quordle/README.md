@@ -2,9 +2,8 @@
 
 Отдельная русскоязычная Mini App для четырёх слов. Кнопка в тестовом
 `@tg_template_test_bot`: **«Слова 🧩» → «КВОРДЛИ»**. Команда `/quordle`
-сразу открывает приглашение. «5БУКВ» и рабочие службы не запускаются этим
-стендом. Соседняя кнопка нужна для проверки расположения; без явно
-подключённого отдельного тестового URL она сообщает, что «5БУКВ» не запущена.
+сразу открывает приглашение. На полном тестовом Copilot в этом меню две
+игры. Рабочие службы не запускаются этим стендом.
 
 ## Правила
 
@@ -66,18 +65,29 @@
    `tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:8792`.
    Из его лога берётся свежий HTTPS-адрес Quick Tunnel. После перезапуска
    туннеля этот адрес меняется.
-3. Из корня репозитория в двух терминалах (с одинаковым `$origin`):
+3. Для «5БУКВ» используется её штатный тестовый API
+   `prototypes.wordli.telegram_server` на отдельном порту и с отдельным
+   Quick Tunnel. Его HTTPS-адрес указывается как `WORDLI_WEBAPP_URL`
+   в локальном `.env.test.local`. Игровые исходники менять не нужно.
+4. Из корня репозитория в двух терминалах (с одинаковым `$origin`):
 
    ```powershell
    .\local_testing\venv\Scripts\python.exe -B -m prototypes.quordle.server --origin $origin
-   .\local_testing\venv\Scripts\python.exe -B -m prototypes.quordle.demo_bot --url $origin
+   .\local_testing\venv\Scripts\python.exe -B -m prototypes.quordle.full_test_bot --url $origin
    ```
 
-4. Открыть чат тестового бота, `/quordle`, затем кнопку. Проверка API:
+5. Открыть чат тестового бота, `/start` → «Слова 🧩», затем кнопку. Проверка API:
    `/health` отвечает без авторизации, запросы партии требуют подписанное
    Telegram `initData`. Напоминания выключены по умолчанию; при включении
    отправляются в 05:50–06:10 по указанному часовому поясу, только если
    первая партия дня ещё не завершена.
+
+Полный тестовый бот использует штатные обработчики Copilot и локальные
+фотофикстуры. Адаптер меняет только название раздела и добавляет
+«КВОРДЛИ» рядом с «5БУКВ» для тестеров. Погода и валюта требуют отдельных
+тестовых ключей провайдеров; ключи из рабочей среды не подставляются.
+Не запускать `demo_bot`, `run_test_bot` или другой polling параллельно
+с `full_test_bot` на том же токене.
 
 Для браузерного теста без Telegram:
 
@@ -94,7 +104,7 @@
 
 ```powershell
 $env:QUORDLE_RUN_DB_TESTS = '1' # включить только при поднятом отдельном Docker PostgreSQL
-.\local_testing\venv\Scripts\python.exe -B -m unittest -v prototypes.quordle.test_engine prototypes.quordle.test_integration
+.\local_testing\venv\Scripts\python.exe -B -m unittest -v prototypes.quordle.test_engine prototypes.quordle.test_integration prototypes.quordle.test_full_bot
 node --check prototypes/quordle/quordle.js
 ```
 

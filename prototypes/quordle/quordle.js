@@ -14,6 +14,11 @@
   const colors = {correct: 'на месте', present: 'есть', absent: 'нет', solved: 'поле решено', '': 'неизвестно'};
   const priority = {'': 0, absent: 1, present: 2, correct: 3};
   const keyElements = new Map();
+  // Те же линейные пиктограммы, что на клавиатуре «5БУКВ».
+  const keyIcons = {
+    '↵': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+    '⌫': '<svg viewBox="0 0 28 24" aria-hidden="true"><path d="M10 4h14v16H10L2 12Z"/><path d="m13 9 6 6m0-6-6 6"/></svg>',
+  };
   let tg = window.Telegram?.WebApp;
   const launchParams = new URLSearchParams(location.hash.slice(1));
   const signedHash = launchParams.get('tgWebAppData') || '';
@@ -122,7 +127,7 @@
     $('boards').replaceChildren(fragment);
   }
   function makeKeys() {
-    for (const row of ['ЙЦУКЕНГШЩЗХЪ', 'ФЫВАПРОЛДЖЭ', '⌫ЯЧСМИТЬБЮ↵']) {
+    for (const row of ['ЙЦУКЕНГШЩЗХЪ', 'ФЫВАПРОЛДЖЭ', '↵ЯЧСМИТЬБЮ⌫']) {
       const line = el('div', 'keyboard-row');
       for (const key of row) {
         const action = key === '↵' || key === '⌫';
@@ -133,9 +138,8 @@
           const sectors = el('span', 'key-sectors');
           sectors.setAttribute('aria-hidden', 'true');
           sectors.append(...Array.from({length: 4}, () => el('i')));
-          btn.append(sectors); keyElements.set(key, btn);
-        }
-        btn.append(el('span', action ? '' : 'key-letter', key));
+          btn.append(sectors, el('span', 'key-letter', key)); keyElements.set(key, btn);
+        } else btn.innerHTML = keyIcons[key];
         line.append(btn);
       }
       $('keyboard').append(line);
@@ -144,6 +148,8 @@
   function drawKeys(boards) {
     for (const [letter, btn] of keyElements) {
       const parts = boards.map(b => b.solved ? 'solved' : b.keyboard?.[letter] || '');
+      const lightParts = parts.filter(p => p === 'present' || p === 'correct').length;
+      btn.dataset.ink = lightParts === 4 ? 'dark' : lightParts ? 'mixed' : 'light';
       Array.from(btn.firstElementChild.children).forEach((part, i) => { part.dataset.color = parts[i]; });
       btn.setAttribute('aria-label', letter + ': ' + parts.map((p, i) => names[i] + ' — ' + colors[p]).join('; '));
     }
@@ -281,6 +287,8 @@
     const delta = document.querySelector('[data-score-delta]');
     delta.hidden = !stats.score_delta;
     delta.textContent = (stats.score_delta > 0 ? '+' : '') + (stats.score_delta ?? '');
+    delta.parentElement.classList.toggle('stat-score-number--compact',
+      !delta.hidden && String(data.score).length >= 4 && delta.textContent.length >= 4);
     const max = Math.max(1, ...stats.distribution);
     const rows = stats.distribution.map((n, i) => {
       const row = el('div', 'distribution-row');
@@ -363,9 +371,10 @@
       if (b.solved) {
         node.type = 'button'; node.dataset.word = b.answer; node.setAttribute('aria-expanded', 'false');
         node.setAttribute('aria-controls', 'definition-popover');
-        node.append(el('span', '', '✓'));
+        const check = el('span', 'result-check');
+        check.innerHTML = keyIcons['↵']; node.append(check);
       }
-      node.append(el('span', '', b.answer || '—'));
+      node.append(el('span', 'result-word', b.answer || '—'));
       return node;
     });
     $('result-cards').replaceChildren(...cards);

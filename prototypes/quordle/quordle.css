@@ -803,14 +803,17 @@ button:focus-visible {
   50% { transform: translateX(4px); }
 }
 
-/* Та же оболочка, но поле рассчитано на девять общих ходов. */
+/* Шапка, клавиатура и страницы используют размеры «5БУКВ».
+   Только четыре поля подстраиваются под оставшуюся высоту. */
 body[data-screen="game"] .app-shell {
-  width: min(100%, 760px); height: 100vh; height: 100dvh;
-  min-height: 320px; padding-block: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-bottom));
+  height: 100vh; height: 100dvh; min-height: 320px;
 }
-body[data-screen="game"] .app-header { margin-bottom: 4px; }
-.screen--game { flex: 1 1 0; min-height: 0; gap: 6px; justify-content: flex-start; }
-#status-line { color: var(--muted); font-size: 12px; text-align: center; }
+.wordmark { flex: 0 1 auto; min-width: 0; margin-inline-end: 8px; }
+.wordmark span { flex-shrink: 1; min-width: 0; }
+.header-actions { flex-shrink: 0; }
+.screen--game { flex: 1 1 0; min-height: 0; justify-content: flex-start; gap: 0; }
+#status-line { color: var(--muted); font-size: 13px; text-align: center;
+  line-height: 1.4; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
 .board-space { display: flex; width: 100%; flex: 1 1 0; overflow-y: auto; min-height: 0; container-type: size; }
 #boards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; align-content: center;
   gap: 7px 10px; width: min(100%, max(235px,calc((100cqh - 42px)*.80))); margin: auto; }
@@ -819,38 +822,48 @@ body[data-screen="game"] .app-header { margin-bottom: 4px; }
   height: calc((100cqw - 4 * var(--gap)) * .128); }
 .quad-row.current { height: calc((100cqw - 4 * var(--gap)) * .20); }
 .quad-cell { display: grid; min-width: 0; min-height: 0; place-items: center; border-radius: clamp(3px,1vw,6px);
-  background: var(--tile-empty); font-weight: 500; font-size: clamp(10px, 8cqw, 21px); line-height: 1;
+  background: var(--tile-empty); font-weight: 400; font-size: clamp(10px, 8cqw, 21px); line-height: 1;
   border: 1px solid transparent; color: var(--text); }
 .quad-row.current .quad-cell { font-size: clamp(13px,11cqw,33px); cursor: text; }
-.quad-row.current .quad-cell[aria-current=true] { border-color: #aaa; }
+.quad-row.current .quad-cell[aria-current=true] { border-color: #6b6b6b; }
 .quad-cell[data-color=correct] { background: var(--yellow); color: #282828; }
 .quad-cell[data-color=present] { background: var(--white); color: #262626; }
 .quad-cell[data-color=absent] { background: var(--tile-absent); }
 .quad-cell[data-hint=true] { color: #fedd2c88; }
 .quad-cell[data-exact=true] { color: var(--yellow); }
 .quad-row.invalid .quad-cell { color: #ef7373; animation: invalid-word 420ms; }
-.keyboard { max-width: 590px; gap: 5px; margin: 0 auto; }
+.screen--game .keyboard { margin: 24px auto 0; }
 .key { position: relative; isolation: isolate; overflow: hidden; }
 .key-sectors { inset: 0; position: absolute; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; z-index: -1; pointer-events: none; }
 .key-sectors i[data-color=correct] { background: var(--yellow); }
 .key-sectors i[data-color=present] { background: var(--white); }
 .key-sectors i[data-color=absent] { background: var(--tile-absent); }
 .key-sectors i[data-color=solved] { background: #39393b; }
-.key-letter { text-shadow: -1px -1px 0 #252525, 1px -1px 0 #252525, -1px 1px 0 #252525, 1px 1px 0 #252525; }
+.key[data-ink="dark"] .key-letter { color: #262626; }
+.key[data-ink="mixed"] .key-letter { text-shadow: -1px -1px 0 #252525, 1px -1px 0 #252525, -1px 1px 0 #252525, 1px 1px 0 #252525; }
 .key:disabled { cursor: default; }
-.result-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 24px 0 12px; }
-.result-card { min-height: 58px; border-radius: 12px; display: flex; justify-content: center; align-items: center; gap: 6px;
-  padding: 10px 4px; background: var(--tile-absent); color: #eee; font-size: clamp(16px,4.5vw,23px); }
-button.result-card { background: var(--yellow); color: #242424; font-weight: 600; }
-.round-score { color: var(--muted); margin: 10px 0 22px; }
+.result-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 36px 0 32px; }
+.result-card { min-height: 56px; border: 1px solid #3a3a3a; border-radius: 14px; display: flex; justify-content: center; align-items: center; gap: 7px;
+  padding: 12px 6px; background: var(--tile-empty); color: #c2c2c2; font-size: clamp(16px, 4.2vw, 20px); line-height: 1.25; }
+button.result-card { border-color: var(--yellow); background: var(--yellow); color: #242424; font-weight: 500; }
+button.result-card:active { filter: brightness(.9); }
+button.result-card[aria-expanded="true"] .result-word,
+button.result-card:focus-visible .result-word { text-decoration: underline; text-underline-offset: 3px; }
+.result-check svg { display: block; width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.attempts-card .round-score { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 14px 0 0; }
+.stats-grid--quordle { grid-template-columns: repeat(6,minmax(0,1fr)); }
+.stats-grid--quordle .stat-card { grid-column: span 2; }
+.stats-grid--quordle .stat-card--words { grid-column: span 3; }
 .score-formula { line-height: 1.45; font-variant-numeric: tabular-nums; }
-.screen--summary .replay-button { margin: 0 auto 18px; }
 .leaderboard-label { text-overflow: ellipsis; }
-.wordmark span { width: clamp(19px,5.6vw,31px); }
+@media (max-height: 700px) {
+  .screen--game .keyboard { margin-top: 18px; }
+}
 @media (orientation: landscape) and (max-height: 500px) {
   body[data-screen="game"] .app-shell { width: min(100%, 950px); min-height: 260px; padding-block: 3px; }
   .screen--game { gap: 3px; }
-  .screen--game .keyboard { --key-height: 27px; gap: 2px; }
+  #status-line { margin: 0; }
+  .screen--game .keyboard { max-width: 484px; margin-top: 0; --key-height: 27px; gap: 2px; }
   body[data-screen="game"] .app-header { min-height: 26px; margin: 0; }
   body[data-screen="game"] .app-header button { height: 28px; }
   #boards { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); width: min(100%,max(440px,calc((100cqh - 16px)*3.22))); }
