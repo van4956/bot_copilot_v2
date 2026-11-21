@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1c1c1e">
+  <meta name="referrer" content="no-referrer">
+  <title>КВОРДЛИ</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="quordle.css">
+  <script src="quordle.js" defer></script>
+</head>
+<body data-screen="game">
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="wordmark" aria-label="Квордли"><span aria-hidden="true">К</span><span aria-hidden="true">В</span><span aria-hidden="true">О</span><span aria-hidden="true">Р</span><span aria-hidden="true">Д</span><span aria-hidden="true">Л</span><span aria-hidden="true">И</span></div>
+      <nav class="header-actions" aria-label="Разделы игры">
+        <button class="icon-button" type="button" data-action="open-stats" aria-label="Открыть статистику" title="Статистика">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h4v8H4zM10 4h4v16h-4zM16 8h4v12h-4z"/></svg>
+        </button>
+        <button class="icon-button" type="button" data-action="open-settings" aria-label="Открыть настройки" title="Настройки">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.3-1.8 1-2.3-.6-2.4 4.2 1.7 1.7v2.1l-1.7 1.7 2.4 4.2 2.3-.6 1.8 1 .6 2.3h5l.6-2.3 1.8-1 2.3.6 2.4-4.2-1.7-1.7v-2.1l1.7-1.7-2.4-4.2-2.3.6-1.8-1L14.5 3z"/><circle cx="12" cy="12.6" r="3.1"/></svg>
+        </button>
+        <button class="icon-button" type="button" data-action="close-app" aria-label="Свернуть приложение" title="Свернуть приложение">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </nav>
+    </header>
+
+    <main id="game-screen" class="screen screen--game" aria-label="Квордли: четыре поля">
+      <div id="status-line" aria-live="polite">Загрузка игры…</div>
+      <button type="button" class="primary-button" data-action="reload" hidden id="retry">Повторить загрузку</button>
+      <div class="board-space"><div id="boards" aria-label="Четыре игровых поля"></div></div>
+      <div id="keyboard" class="keyboard" role="group" aria-label="Общая клавиатура"></div>
+    </main>
+
+    <section id="stats-screen" class="screen screen--stats" aria-labelledby="stats-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-game" aria-label="Назад к игре" title="Назад к игре">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="stats-title">Статистика</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="stats-grid" aria-label="Личная статистика">
+        <article class="stat-card"><strong class="stat-value" data-stat="played">0</strong><span class="stat-label">Всего сыграно</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="win-rate">0%</strong><span class="stat-label">Доля побед</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="average">—</strong><span class="stat-label">Попыток на победу</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="max-streak">0</strong><span class="stat-label">Максимальная серия</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="win-streak">0</strong><span class="stat-label">Текущая серия</span></article>
+        <article class="stat-card stat-card--score"><span class="stat-score-number"><strong class="stat-value" data-stat="score">—</strong><span class="stat-score-delta" data-score-delta hidden></span></span><span class="stat-label">Рейтинг</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="wins">0</strong><span class="stat-label">Полных побед</span></article>
+        <article class="stat-card"><strong class="stat-value" data-stat="solved">0</strong><span class="stat-label">Отгадано слов</span></article>
+      </div>
+      <section class="distribution-section" aria-labelledby="distribution-title">
+        <h2 id="distribution-title">Распределение попыток</h2>
+        <div id="distribution" class="distribution" role="list" aria-label="Победы за 4–9 общих попыток"></div>
+      </section>
+    </section>
+
+    <section id="settings-screen" class="screen screen--settings" aria-labelledby="settings-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-game" aria-label="Назад к игре" title="Назад к игре">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="settings-title">Настройки</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="settings-block reminder-block">
+        <div class="reminder-heading">
+          <h2>Напоминание</h2>
+          <button id="reminder-toggle" class="reminder-switch" type="button" role="switch" aria-checked="false" aria-label="Ежедневное напоминание сыграть" data-action="toggle-reminder" disabled><span></span></button>
+        </div>
+        <time id="next-word-countdown" class="next-word-countdown" aria-label="До новых слов">00:00:00</time>
+        <p class="reminder-caption">до новых слов</p>
+      </div>
+      <button class="settings-block rules-link" type="button" data-action="open-rules">
+        <span class="rules-link-title">Правила</span>
+        <span class="rules-link-caption">игры «Квордли»</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+      <button class="settings-block rules-link" type="button" data-action="open-formula">
+        <span class="rules-link-title">Формула</span>
+        <span class="rules-link-caption">расчета очков</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+      <button class="settings-block rules-link" type="button" data-action="open-leaderboard">
+        <span class="rules-link-title">Рейтинг</span>
+        <span class="rules-link-caption">топ участников</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <section id="formula-screen" class="screen screen--formula" aria-labelledby="formula-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="formula-title">Формула</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <article class="rules-content formula-content">
+        <h2>Очки за партию</h2>
+        <p>Если угаданы не все четыре слова, каждое найденное слово даёт 10 очков: от 0 до 30. Это не считается победой.</p>
+        <div class="score-formula">Победа: 60 + 8 × (9 − число попыток)</div>
+        <p>Четыре слова за 4 хода — 100 очков; за 9 ходов — 60. Неподтверждённый ввод и неизвестное слово не тратят попытку.</p>
+        <h3>Личный рейтинг</h3><div class="score-formula">100 × средние очки за партию</div>
+        <p class="formula-note">Появляется после пяти завершённых партий. Рейтинг от 0 до 10 000, история отдельна от «5БУКВ». Незаконченные партии не учитываются.</p>
+      </article>
+    </section>
+
+    <section id="leaderboard-screen" class="screen screen--leaderboard" aria-labelledby="leaderboard-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="leaderboard-title">Рейтинг</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <div class="leaderboard-content">
+        <p id="leaderboard-status" class="leaderboard-status" role="status">Загрузка…</p>
+        <table id="leaderboard-table" class="leaderboard-table" aria-label="Топ участников за всё время" hidden>
+          <thead><tr><th scope="col">Имя</th><th scope="col">Игр</th><th scope="col">Очки</th></tr></thead>
+          <tbody id="leaderboard-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="rules-screen" class="screen screen--rules" aria-labelledby="rules-title" hidden>
+      <div class="page-heading">
+        <button class="icon-button" type="button" data-action="back-settings" aria-label="Назад к настройкам" title="Назад к настройкам">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="rules-title">Правила</h1>
+        <span class="heading-spacer" aria-hidden="true"></span>
+      </div>
+      <article class="rules-content">
+        <h2>Четыре слова, девять попыток</h2>
+        <p>Отгадайте четыре разных русских существительных из пяти букв. Один ввод — один общий ход: слово проверяется на каждом ещё не решённом поле.</p>
+        <div class="rules-example" aria-label="Цветные подсказки"><span class="rule-tile rule-tile--correct">А</span><span class="rule-tile rule-tile--present">Б</span><span class="rule-tile rule-tile--absent">В</span></div>
+        <p><b>Жёлтая</b> — буква на месте. <b>Белая</b> — буква есть, но в другом месте. <b>Серая</b> — буквы нет или введён лишний повтор. Сначала проверяются точные совпадения. «Ё» и «Е» равны.</p>
+        <p>Каждая клавиша показывает подсказки для четырёх полей: верхнее левое, верхнее правое, нижнее левое и нижнее правое. После разгадки соответствующая четверть приглушается.</p>
+        <p>Нажмите на ячейку текущего ряда, чтобы заменить букву. Черновик общий, а подсказки уже известных мест — отдельные для каждого слова. Введённое слово можно повторить, но это расходует ход.</p>
+        <p>Победа — только 4 из 4. На девятом ходе сохраняются и частичные результаты. Карточки отгаданных слов открывают их определения, неотгаданные ответы — только для просмотра.</p>
+        <p>Четвёрка персональная. Слова не повторяются в пределах цикла. Если слов для новой четвёрки не хватит, начнётся новый перемешанный цикл. После результата можно сразу играть ещё раз.</p>
+        <p>Игровые сутки сменяются в 00:00 UTC. Брошенная до полуночи партия не считается поражением, но уже отгаданные слова сохраняются.</p>
+      </article>
+    </section>
+
+    <section id="summary-screen" class="screen screen--summary" aria-labelledby="result-title" hidden>
+      <h1 id="result-title" class="summary-title"></h1>
+      <p id="result-text" class="summary-text"></p>
+      <div id="result-cards" class="result-cards" aria-label="Итоги четырёх полей"></div><p id="round-score" class="round-score"></p>
+      <button class="primary-button replay-button" type="button" data-action="next-game">Играть ещё раз</button>
+      <div id="result-attempts" class="attempts-card">
+        <p>Количество попыток:</p>
+        <div class="attempts-value"><strong id="result-attempt-count">0</strong><span>/9</span></div>
+      </div>
+    </section>
+
+    <section id="exhausted-screen" class="screen screen--closed" aria-label="Смена игрового дня" hidden>
+      <h1>Игровой день завершён</h1>
+      <p>Откройте новую четвёрку. Ваши отгаданные слова сохранены.</p>
+      <button class="primary-button" type="button" data-action="reload">Открыть партию</button>
+    </section>
+
+    <section id="closed-screen" class="screen screen--closed" aria-label="Приложение свёрнуто" hidden>
+      <p>Приложение свёрнуто</p>
+      <button class="primary-button" type="button" data-action="reopen-app">Вернуться к игре</button>
+    </section>
+  </div>
+
+  <aside id="definition-popover" class="definition-popover" role="dialog" aria-modal="false" aria-labelledby="definition-title" aria-describedby="definition-meanings definition-status" hidden>
+    <h2 id="definition-title" class="definition-title"></h2>
+    <p id="definition-status" class="definition-status" role="status" aria-live="polite"></p>
+    <ol id="definition-meanings" class="definition-meanings" hidden></ol>
+    <a id="definition-source" class="definition-source" target="_blank" rel="noopener noreferrer" hidden>Викисловарь</a>
+  </aside>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="confetti" class="confetti" aria-hidden="true"></div>
+</body>
+</html>
