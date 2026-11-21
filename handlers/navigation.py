@@ -72,17 +72,16 @@ async def open_book(message: Message, state: FSMContext, session: AsyncSession) 
 
 
 async def _words_button(message: Message, bot: Bot | None = None) -> bool:
-    """Принимает новую и прежние подписи разрешённой игры."""
-    label = _("Слова 🧩")
-    if message.text == label:
+    """Открывает раздел «Игры», в том числе со старых клавиатур."""
+    legacy_label = _("Слова 🧩")
+    if message.text in {_("Игры 🕹"), legacy_label}:
         return True
     active_bot = bot if bot is not None else getattr(message, "bot", None)
     return (
         keyboard.wordli_enabled(active_bot)
         and message.text in {
-            _("Игры 🕹"),
-            label.removesuffix(" 🧩"),
-            label.removesuffix(" 🧩") + " 🕹",
+            legacy_label.removesuffix(" 🧩"),
+            legacy_label.removesuffix(" 🧩") + " 🕹",
         }
     )
 

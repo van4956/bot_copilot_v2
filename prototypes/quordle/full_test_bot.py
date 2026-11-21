@@ -18,7 +18,6 @@ from aiogram.methods import SendMessage
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
     WebAppInfo,
 )
 from dotenv import dotenv_values
@@ -36,13 +35,6 @@ from .demo_bot import (
     verify_test_bot,
 )
 
-WORDS_LABELS = {
-    "Игры 🕹": "Слова 🧩",
-    "Games 🕹": "Words 🧩",
-    "Juegos 🕹": "Palabras 🧩",
-    "Ігри 🕹": "Слова 🧩",
-}
-
 
 class TwoGamesMenu(BaseRequestMiddleware):
     """Добавляет КВОРДЛИ в штатную разметку, не заменяя обработчики."""
@@ -54,26 +46,10 @@ class TwoGamesMenu(BaseRequestMiddleware):
         self.users = users
 
     def adapt(self, method: SendMessage) -> SendMessage:
-        """Меняет название раздела и добавляет соседнюю кнопку."""
+        """Добавляет соседнюю кнопку только внутри штатного меню игр."""
         if method.chat_id not in self.users:
             return method
         markup = method.reply_markup
-        if isinstance(markup, ReplyKeyboardMarkup):
-            if not any(
-                button.text in WORDS_LABELS for row in markup.keyboard for button in row
-            ):
-                return method
-            rows = [
-                [
-                    button.model_copy(update={"text": WORDS_LABELS[button.text]})
-                    if button.text in WORDS_LABELS else button
-                    for button in row
-                ]
-                for row in markup.keyboard
-            ]
-            return method.model_copy(
-                update={"reply_markup": markup.model_copy(update={"keyboard": rows})}
-            )
         if not isinstance(markup, InlineKeyboardMarkup):
             return method
         rows = markup.inline_keyboard

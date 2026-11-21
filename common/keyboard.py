@@ -80,21 +80,18 @@ def wordli_enabled(bot: Bot | None = None) -> bool:
 
 
 def start_keyboard(bot: Bot | None = None) -> ReplyKeyboardMarkup:
-    """Создаёт главную панель со значком разрешённой игры."""
-    markup = get_keyboard(
+    """Создаёт главную панель с постоянной кнопкой «Игры»."""
+    return get_keyboard(
         _("Погода 🌊"),
         _("Валюта 💵"),
         _("Котики 🐱"),
-        _("Слова 🧩"),
+        _("Игры 🕹"),
         sizes=(
             2,
             2,
         ),
         placeholder="⬇️",
     )
-    if wordli_enabled(bot):
-        markup.keyboard[1][1].text = _("Игры 🕹")
-    return markup
 
 
 # создать обычные inline кнопки с отображаемым текстом

@@ -72,13 +72,13 @@ def _dispatcher(
         await message.answer(
             "Тестовый раздел словесных игр.",
             reply_markup=ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="Слова 🧩")]],
+                keyboard=[[KeyboardButton(text="Игры 🕹")]],
                 resize_keyboard=True,
             ),
         )
 
     @dp.message(Command("quordle"))
-    @dp.message(F.text == "Слова 🧩")
+    @dp.message(F.text == "Игры 🕹")
     async def games(message: Message) -> None:
         """Отправляет кнопки игр в одном ряду."""
         await message.answer("В какую игру сыграем?", reply_markup=menu)
