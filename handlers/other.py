@@ -12,9 +12,10 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    LinkPreviewOptions,
     Message,
 )
-from aiogram.utils.i18n import FSMI18nMiddleware
+from aiogram.utils.i18n import FSMI18nMiddleware, get_i18n
 from aiogram.utils.i18n import gettext as _
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -77,7 +78,16 @@ async def process_help_command(
     ]
     inline_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    msg = await message.answer(text=await _status_text(), reply_markup=inline_kb)
+    text = await _status_text()
+    credits = getattr(getattr(message, "bot", None), "weather_credits", None)
+    if callable(credits):
+        msg = await message.answer(
+            text=f"{text.rstrip()}\n\n{credits(get_i18n().current_locale)}",
+            reply_markup=inline_kb,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
+        )
+    else:
+        msg = await message.answer(text=text, reply_markup=inline_kb)
 
     # Сохраняем message_id в FSMContext
     await state.update_data(last_message_id=msg.message_id)

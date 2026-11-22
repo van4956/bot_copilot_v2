@@ -349,8 +349,7 @@
       });
       $('leaderboard-rows').replaceChildren(...rows);
       table.hidden = !rows.length;
-      status.textContent = !rows.length ? 'Пока нет участников с пятью завершёнными партиями.'
-        : state.stats.played < 5 ? 'Для участия завершите 5 партий.' : '';
+      status.textContent = rows.length ? '' : 'Пока нет участников с пятью завершёнными партиями.';
     } catch (err) { if (generation === ratingGeneration) status.textContent = err.message; }
   }
   function renderResult() {

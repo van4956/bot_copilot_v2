@@ -117,7 +117,7 @@ async def run(quordle: str, check_only: bool, seed_cookbook: bool = False) -> No
     from local_testing.testing.local_bootstrap import configure_local_fixtures
     from .demo_recipes import seed_demo_recipes
     from .test_currency_source import ATTRIBUTION_HTML, get_currency_rate
-    from .test_weather_source import fetch_test_weather
+    from .test_weather_source import fetch_test_weather, weather_credits
 
     configure_local_fixtures()
     if seed_cookbook:
@@ -135,6 +135,7 @@ async def run(quordle: str, check_only: bool, seed_cookbook: bool = False) -> No
         bot.session.middleware(menu)
         if not config.tg_bot.api_weather:
             bot.weather_provider = fetch_test_weather
+            bot.weather_credits = weather_credits
         if not config.tg_bot.api_currency:
             bot.currency_provider = get_currency_rate
             bot.currency_attribution = ATTRIBUTION_HTML

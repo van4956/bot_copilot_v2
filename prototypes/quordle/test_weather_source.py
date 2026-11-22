@@ -25,8 +25,12 @@ NOT_FOUND = {
     "uk": "Населений пункт не знайдено. Уточніть назву або надішліть GPS.",
     "es": "Lugar no encontrado. Comprueba el nombre o envía tu ubicación.",
 }
-ROUNDED = {
-    "ru": "Округлено", "en": "Rounded", "uk": "Округлено", "es": "Redondeado",
+WEATHER_LINK = '<a href="https://open-meteo.com/">Open-Meteo</a>'
+WEATHER_CREDIT_LABELS = {
+    "ru": ("Источники погоды", "Значения округлены."),
+    "en": ("Weather sources", "Values are rounded."),
+    "uk": ("Джерела погоди", "Значення округлено."),
+    "es": ("Fuentes del tiempo", "Los valores están redondeados."),
 }
 
 # Группы WMO преобразуются в значки, уже принятые штатным форматтером.
@@ -37,6 +41,17 @@ ICON_GROUPS = {
 }
 ICONS = {code: group for group, codes in ICON_GROUPS.items() for code in codes}
 WeatherRow = tuple[str, str, str, str, str]
+
+
+def weather_credits(locale: str | None) -> str:
+    """Возвращает полную атрибуцию для страницы информации тестового бота."""
+    heading, note = WEATHER_CREDIT_LABELS[normalize_locale(locale)]
+    return (
+        f"{heading}: {WEATHER_LINK}; "
+        '<a href="https://www.geonames.org/">GeoNames</a>; '
+        '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. '
+        f"{note}"
+    )
 
 
 def _coordinate(value: object, limit: int) -> bool:
@@ -145,6 +160,8 @@ async def fetch_test_weather(
         data = await get_json(FORECAST, params=params, session=session)
         zone = ZoneInfo(data["timezone"])
         header = weather._weather_header(name, {"lat": lat, "lon": lon})
+        location, coordinates = header.rsplit("\n", 1)
+        header = f"{location} · {WEATHER_LINK}\n{coordinates}"
         if type_forecast == 1:
             current = data["current"]
             moment = datetime.fromtimestamp(current["time"], zone)
@@ -161,10 +178,4 @@ async def fetch_test_weather(
     except (AttributeError, IndexError, KeyError, OSError, OverflowError,
             TypeError, ValueError):
         return translate("Сервис погоды вернул некорректный ответ")
-    sources = '<a href="https://open-meteo.com/">Open-Meteo</a>'
-    if query:
-        sources += ' · <a href="https://www.geonames.org/">GeoNames</a>'
-    license_link = (
-        '<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>'
-    )
-    return f"{body}\n\n{sources} · {license_link} · {ROUNDED[language]}"
+    return body
