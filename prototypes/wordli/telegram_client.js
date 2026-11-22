@@ -83,10 +83,13 @@
             const operation = pendingCommand;
             try {
                 const next = await request(`/api/${operation.action}`, operation.payload);
-                // Идемпотентный ответ старого запроса не должен откатить новое устройство.
+                // Каноническое чтение обновляет в том числе цвета без смены ревизии.
                 const latest = await request('/api/state', {});
                 pendingCommand = null;
-                return accept(latest.revision > next.revision ? latest : next, latest.revision > next.revision ? 'refresh' : action);
+                return accept(
+                    latest.revision >= next.revision ? latest : next,
+                    latest.revision > next.revision ? 'refresh' : action
+                );
             } catch (error) {
                 if (isConflict(error)) { await conflict(error); return state; }
                 if (error.code && error.code !== 'unavailable') pendingCommand = null;

@@ -26,6 +26,7 @@ from config_data.config import (
     ROOT,
     Config,
     load_config,
+    validate_quordle_url,
     validate_test_database,
     validate_wordli_url,
 )
@@ -98,6 +99,10 @@ def create_bot(config: Config) -> Bot:
     )
     if not config.test_mode and config.wordli_enabled is True and not wordli_url:
         raise ValueError("При WORDLI_ENABLED=true нужен WORDLI_WEBAPP_URL")
+    quordle_url = (
+        validate_quordle_url(config.quordle_webapp_url, wordli_url=wordli_url)
+        if not config.test_mode and config.quordle_enabled is True else ""
+    )
     token = config.tg_bot.token_test if config.test_mode else config.tg_bot.token
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     for name in (
@@ -115,6 +120,8 @@ def create_bot(config: Config) -> Bot:
     bot.webapp_base_url = config.webapp_base_url
     bot.wordli_webapp_url = wordli_url
     bot.wordli_enabled_verified = bool(wordli_url and wordli_requested)
+    bot.quordle_webapp_url = quordle_url
+    bot.quordle_enabled_verified = bool(quordle_url)
     custom_emoji_enabled = bool(bot.wordli_webapp_url and config.test_mode)
     bot.wordli_custom_emoji_id = (
         config.wordli_custom_emoji_id if custom_emoji_enabled else ""

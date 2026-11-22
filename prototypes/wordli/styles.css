@@ -195,10 +195,11 @@ button:focus-visible {
 }
 
 .keyboard {
+  --row-gap: 8px;
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--row-gap);
   width: 100%;
   user-select: none;
 }
@@ -211,21 +212,54 @@ button:focus-visible {
 
 .keyboard-row:nth-child(2) { padding: 0 calc((100% - 11 * var(--key-gap)) / 24); }
 
-.key {
-  display: grid;
+.key-slot {
+  --hit-top: 0px;
+  --hit-right: 0px;
+  --hit-bottom: 0px;
+  --hit-left: 0px;
+  position: relative;
   flex: 1 1 0;
   min-width: 0;
   height: var(--key-height);
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 7px;
+}
+
+.key-slot--action { flex-grow: 1.45; }
+
+/* Кнопки делят только внутренние зазоры. Плашки остаются на своих местах. */
+@media (any-pointer: coarse) {
+  .key-slot:not(.key-slot--action):not(:first-child) { --hit-left: calc(var(--key-gap) / 2); }
+  .key-slot:not(.key-slot--action):not(:last-child) { --hit-right: calc(var(--key-gap) / 2); }
+  .keyboard-row:not(:first-child) .key-slot:not(.key-slot--action) { --hit-top: calc(var(--row-gap) / 2); }
+  .keyboard-row:not(:last-child) .key-slot:not(.key-slot--action) { --hit-bottom: calc(var(--row-gap) / 2); }
+}
+
+.key {
+  position: absolute;
+  left: calc(0px - var(--hit-left));
+  top: calc(0px - var(--hit-top));
+  width: calc(100% + var(--hit-left) + var(--hit-right));
+  height: calc(100% + var(--hit-top) + var(--hit-bottom));
+  appearance: none;
   color: #f0f0f0;
   background: transparent;
   font-size: clamp(15px, 4.25vw, 23px);
   font-weight: 400;
   line-height: 1;
+}
+
+.key-face {
+  position: absolute;
+  inset: var(--hit-top) var(--hit-right) var(--hit-bottom) var(--hit-left);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 1px solid var(--line);
+  border-radius: 7px;
   transition: filter 100ms ease, transform 100ms ease;
 }
+
+.key:focus-visible { outline: none; }
+.key:focus-visible .key-face { outline: 2px solid var(--yellow); outline-offset: 4px; }
 
 .key svg {
   width: 24px;
@@ -237,34 +271,31 @@ button:focus-visible {
   stroke-linejoin: round;
 }
 
-.key--correct,
-.key[data-state="correct"],
-.key--enter {
+.key--correct .key-face,
+.key[data-state="correct"] .key-face,
+.key--enter .key-face {
   border-color: var(--yellow);
   color: #262626;
   background: var(--yellow);
 }
 
-.key--present,
-.key[data-state="present"],
-.key--delete {
+.key--present .key-face,
+.key[data-state="present"] .key-face,
+.key--delete .key-face {
   border-color: var(--white);
   color: #262626;
   background: var(--white);
 }
 
-.key--absent,
-.key[data-state="absent"] {
+.key--absent .key-face,
+.key[data-state="absent"] .key-face {
   border-color: var(--tile-absent);
   background: var(--tile-absent);
 }
 
-.key--enter,
-.key--delete { flex-grow: 1.45; }
-
 .key--enter svg { width: 27px; height: 27px; }
 
-.key:active {
+.key:active .key-face {
   filter: brightness(0.8);
   transform: translateY(1px);
 }
@@ -623,12 +654,12 @@ button:focus-visible {
 }
 
 .progress-node.is-complete .progress-word--interactive:is([aria-expanded="true"], :focus-visible) {
-  color: var(--yellow);
+  color: var(--muted);
 }
 
 @media (hover: hover) {
   .progress-node.is-complete .progress-word--interactive:hover {
-    color: var(--yellow);
+    color: var(--muted);
   }
 }
 
@@ -781,7 +812,7 @@ button:focus-visible {
 
 @media (hover: hover) {
   .icon-button:hover { background: #303030; }
-  .key:hover { filter: brightness(1.17); }
+  .key:hover .key-face { filter: brightness(1.17); }
 }
 
 @media (min-width: 600px) {
@@ -801,7 +832,7 @@ button:focus-visible {
   .screen--game { gap: 18px; }
   .board { width: min(100%, calc((100svh - 242px) * 0.825)); }
   .tile { font-size: clamp(22px, min(9vw, calc((100svh - 242px) * 0.08)), 42px); }
-  .keyboard { gap: 6px; }
+  .keyboard { --row-gap: 6px; }
   .key svg { width: 22px; height: 22px; }
   .toast { top: 75px; }
 }

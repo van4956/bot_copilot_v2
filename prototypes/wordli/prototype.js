@@ -836,25 +836,32 @@
             });
         }
         function makeKey(letter, action) {
+            const slot = doc.createElement('span');
+            slot.className = action ? 'key-slot key-slot--action' : 'key-slot';
             const key = doc.createElement('button');
             key.type = 'button';
             key.className = 'key';
+            const face = doc.createElement('span');
+            face.className = 'key-face';
+            face.setAttribute('aria-hidden', 'true');
             key.disabled = !state || client.busy || Boolean(state.game.outcome)
                 || state.game.status === 'exhausted' || (action === 'enter' && revealActive);
             if (action) {
                 key.classList.add(`key--${action}`);
                 key.dataset.keyAction = action;
                 key.setAttribute('aria-label', action === 'enter' ? 'Подтвердить слово' : 'Удалить букву');
-                key.innerHTML = action === 'enter' ? ENTER_ICON : DELETE_ICON;
+                face.innerHTML = action === 'enter' ? ENTER_ICON : DELETE_ICON;
             } else {
-                key.textContent = letter;
+                face.textContent = letter;
                 key.dataset.letter = letter;
                 const keyState = state?.game.keyboard[letter];
                 key.dataset.state = keyState || 'empty';
                 key.setAttribute('aria-label', `${letter}${keyState ? `, ${STATE_LABELS[keyState]}` : ''}`);
                 if (keyState) key.classList.add(`key--${keyState}`);
             }
-            return key;
+            key.appendChild(face);
+            slot.appendChild(key);
+            return slot;
         }
         function renderKeyboard() {
             const restoreFocus = keyboard.contains(doc.activeElement);

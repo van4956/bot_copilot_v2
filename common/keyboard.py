@@ -79,6 +79,20 @@ def wordli_enabled(bot: Bot | None = None) -> bool:
     )
 
 
+def quordle_enabled(bot: Bot | None = None) -> bool:
+    """Проверяет рабочий вход; тестовую кнопку добавляет отдельный стенд."""
+    return (
+        getattr(bot, "test_mode", None) is False
+        and getattr(bot, "quordle_enabled_verified", False) is True
+        and bool(getattr(bot, "quordle_webapp_url", ""))
+    )
+
+
+def games_enabled(bot: Bot | None = None) -> bool:
+    """Проверяет, доступен ли выбор хотя бы одной игры."""
+    return wordli_enabled(bot) or quordle_enabled(bot)
+
+
 def start_keyboard(bot: Bot | None = None) -> ReplyKeyboardMarkup:
     """Создаёт главную панель с постоянной кнопкой «Игры»."""
     return get_keyboard(

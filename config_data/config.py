@@ -1,6 +1,7 @@
 """Явные настройки боевого и изолированного тестового запуска."""
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -63,6 +64,8 @@ class Config:
     wordli_webapp_url: str = ""
     wordli_custom_emoji_id: str = ""
     wordli_custom_emoji_fallback: str = ""
+    quordle_enabled: bool = False
+    quordle_webapp_url: str = ""
 
     @property
     def test_mode(self) -> bool:
@@ -100,8 +103,10 @@ def _bool(value: str) -> bool:
     return value.lower() in {"true", "1"}
 
 
-def validate_wordli_url(value: str, *, test_mode: bool) -> str:
-    """Проверяет отдельный HTTPS-адрес игры без учётных данных."""
+def _validate_game_url(
+    value: str, *, test_mode: bool, production_paths: tuple[str, ...], setting: str
+) -> str:
+    """Проверяет общий для игровых ссылок формат и допустимый рабочий путь."""
     if not value:
         return ""
     try:
@@ -124,7 +129,7 @@ def validate_wordli_url(value: str, *, test_mode: bool) -> str:
             )
             or (port is not None and not 1 <= port <= 65535)
             or value.startswith(PRODUCTION_WEBAPP_URL)
-            or (not test_mode and parsed.path not in {"", "/"})
+            or (not test_mode and parsed.path not in production_paths)
             or (
                 not test_mode
                 and (
@@ -136,8 +141,56 @@ def validate_wordli_url(value: str, *, test_mode: bool) -> str:
     except ValueError:
         invalid = True
     if invalid:
-        raise ValueError("WORDLI_WEBAPP_URL требует отдельный HTTPS-адрес")
+        raise ValueError(f"{setting} требует отдельный HTTPS-адрес")
     return value
+
+
+def validate_wordli_url(value: str, *, test_mode: bool) -> str:
+    """Проверяет адрес «5БУКВ», сохраняя прежний формат тестовых ссылок."""
+    return _validate_game_url(
+        value, test_mode=test_mode, production_paths=("", "/"),
+        setting="WORDLI_WEBAPP_URL",
+    )
+
+
+def validate_quordle_url(value: str, *, wordli_url: str = "") -> str:
+    """Проверяет рабочую ссылку «КВОРДЛИ», отдельную от входа «5БУКВ»."""
+    if not value:
+        raise ValueError("При QUORDLE_ENABLED=true нужен QUORDLE_WEBAPP_URL")
+    _validate_game_url(
+        value, test_mode=False, production_paths=("", "/", "/quordle", "/quordle/"),
+        setting="QUORDLE_WEBAPP_URL",
+    )
+    parsed = urlsplit(value)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    invalid_hosts = (
+        "localhost", "local", "internal", "test", "trycloudflare.com",
+        "ngrok.app", "ngrok.io", "ngrok-free.app", "ngrok-free.dev",
+        "loca.lt", "localhost.run",
+    )
+    labels = host.split(".")
+    if (
+        len(labels) < 2
+        or not all(
+            re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+            for label in labels
+        )
+        or not re.fullmatch(r"[a-z]{2,63}|xn--[a-z0-9-]+", labels[-1])
+        or any(host == item or host.endswith("." + item) for item in invalid_hosts)
+    ):
+        raise ValueError(
+            "QUORDLE_WEBAPP_URL требует постоянный публичный HTTPS-адрес"
+        )
+    if wordli_url:
+        old = urlsplit(wordli_url)
+        if (
+            host == (old.hostname or "").lower().rstrip(".")
+            and (parsed.port or 443) == (old.port or 443)
+            and parsed.path.rstrip("/") == old.path.rstrip("/")
+        ):
+            raise ValueError("QUORDLE_WEBAPP_URL совпадает с WORDLI_WEBAPP_URL")
+    # Относительные ссылки на статику и API должны оставаться в каталоге игры.
+    return value + "/" if parsed.path == "/quordle" else value
 
 
 def load_config(path: str | None = None) -> Config:
@@ -206,6 +259,11 @@ def load_config(path: str | None = None) -> Config:
     )
     if wordli_enabled and not wordli:
         raise ValueError("При WORDLI_ENABLED=true нужен WORDLI_WEBAPP_URL")
+    quordle_enabled = not test and _bool(values.get("QUORDLE_ENABLED", "false"))
+    quordle = (
+        validate_quordle_url(values.get("QUORDLE_WEBAPP_URL", ""), wordli_url=wordli)
+        if quordle_enabled else ""
+    )
     emoji_id = values.get("WORDLI_CUSTOM_EMOJI_ID", "") if test else ""
     emoji_fallback = ""
     if emoji_id:
@@ -255,5 +313,7 @@ def load_config(path: str | None = None) -> Config:
         wordli_webapp_url=wordli,
         wordli_custom_emoji_id=emoji_id,
         wordli_custom_emoji_fallback=emoji_fallback,
+        quordle_enabled=quordle_enabled,
+        quordle_webapp_url=quordle,
         expected_test_bot_id=int(expected_id) if expected_id else None,
     )

@@ -2,6 +2,7 @@ name: bot_04_copilot_v2
 
 services:
   bot:
+    image: bot_04_copilot_v2-bot:${COPILOT_IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -36,10 +37,11 @@ services:
       - APP_ENV=production
       - WORDLI_ENABLED=${WORDLI_ENABLED:-false}
       - WORDLI_WEBAPP_URL=${WORDLI_WEBAPP_URL:-}
+      - QUORDLE_ENABLED=${QUORDLE_ENABLED:-false}
+      - QUORDLE_WEBAPP_URL=${QUORDLE_WEBAPP_URL:-}
       - AUTO_CREATE_SCHEMA=false
       - DROP_PENDING_UPDATES=false
       - BOT_TOKEN=${BOT_TOKEN}
-      - BOT_TOKEN_TEST=${BOT_TOKEN_TEST}
       - OWNER=${OWNER}
       - ADMIN_LIST=${ADMIN_LIST}
       - HOME_GROUP=${HOME_GROUP}

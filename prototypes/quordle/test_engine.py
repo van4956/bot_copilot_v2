@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from prototypes.quordle.engine import GameError, QuordleEngine
+from prototypes.wordli.engine import LocalGameEngine
 
 
 class QuordleEngineTest(unittest.TestCase):
@@ -79,14 +80,14 @@ class QuordleEngineTest(unittest.TestCase):
         self.assertEqual(state["game"]["draft"], "")
         self.assertEqual(state["game"]["boards"][0]["rows"][0]["word"], "АКТЕР")
 
-    def test_per_board_counts_and_frozen_keyboard(self) -> None:
+    def test_per_board_presence_and_frozen_keyboard(self) -> None:
         """Каждое поле оценивает повторы независимо и замирает при решении."""
         self.profile["history"][-1]["answers"] = self.answers[:4]
         first = self.move("КАССА")
         board = first["game"]["boards"][0]
         self.assertEqual(
             board["rows"][0]["states"],
-            ["present", "correct", "correct", "absent", "correct"],
+            ["present", "correct", "correct", "present", "correct"],
         )
         self.assertEqual(board["keyboard"]["С"], "correct")
         frozen = first["game"]["boards"][1]
@@ -95,6 +96,41 @@ class QuordleEngineTest(unittest.TestCase):
         next_view = self.move("АРГОН")
         self.assertEqual(frozen, next_view["game"]["boards"][1])
         self.assertEqual(len(next_view["game"]["boards"][0]["rows"]), 2)
+
+    def test_wordli_feedback_on_four_boards_after_reload(self) -> None:
+        """Все поля используют правила 5БУКВ при ходе и после перезагрузки."""
+        answers = ["КРОНА", "КОФТА", "МЕТРО", "БУЛКА"]
+        guesses = ["ПАРОМ", "СОПЛО"]
+        quordle = QuordleEngine()
+        profile: dict = {}
+        quordle.bootstrap(profile, self.day)
+        profile["history"][0]["answers"] = answers
+        for word in guesses:
+            state = quordle.submit(profile, word, self.day)
+        boards = state["game"]["boards"]
+        duplicate_marks = [
+            (b["rows"][1]["states"][1], b["rows"][1]["states"][4]) for b in boards
+        ]
+        self.assertEqual(duplicate_marks, [
+            ("present", "present"), ("correct", "present"),
+            ("present", "correct"), ("absent", "absent"),
+        ])
+        self.assertEqual(
+            [board["keyboard"]["О"] for board in boards],
+            ["present", "correct", "correct", "absent"],
+        )
+        wordli = LocalGameEngine()
+        for answer, board in zip(answers, boards):
+            record = {
+                "day": self.day.isoformat(), "index": 0,
+                "answer": answer, "dictionary_id": wordli.dictionary_id,
+                "guesses": guesses, "draft": "",
+            }
+            single = wordli.bootstrap([record], self.day)["game"]
+            self.assertEqual(board["rows"], single["rows"])
+            self.assertEqual(board["keyboard"], single["keyboard"])
+        restored = quordle.bootstrap(json.loads(json.dumps(profile)), self.day)
+        self.assertEqual(restored, state)
 
     def test_partial_loss_and_definition_rights(self) -> None:
         """После поражения все раскрытые ответы кликабельны до новой игры."""

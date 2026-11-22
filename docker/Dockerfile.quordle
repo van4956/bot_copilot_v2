@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+COPY requirements-quordle.txt requirements-wordli.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-quordle.txt && python -m pip check
+
+# Dockerfile.quordle.dockerignore перечисляет только runtime, словарь и лицензии.
+COPY prototypes/quordle/ /app/prototypes/quordle/
+COPY prototypes/wordli/ /app/prototypes/wordli/
+USER 10001:10001
+# Офлайн-проверка импорта production entrypoint и комплектности словарей.
+RUN --network=none python -c "from pathlib import Path; from prototypes.quordle.production_server import QuordleEngine, StaticDefinitionCatalog; assert QuordleEngine().dictionary_id == StaticDefinitionCatalog().dictionary_id; assert not Path('local_testing').exists() and not list(Path('prototypes').rglob('demo_*.py')) and not list(Path('prototypes').rglob('test_*.py'))"
+
+CMD ["python", "-m", "prototypes.quordle.production_server"]

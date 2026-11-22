@@ -131,27 +131,32 @@
       const line = el('div', 'keyboard-row');
       for (const key of row) {
         const action = key === '↵' || key === '⌫';
+        const slot = el('div', action ? 'key-slot key-slot--action' : 'key-slot');
         const btn = el('button', 'key' + (key === '↵' ? ' key--enter' : key === '⌫' ? ' key--delete' : ''));
+        const face = el('span', 'key-face');
         btn.type = 'button'; btn.dataset.key = key;
         btn.setAttribute('aria-label', key === '↵' ? 'Подтвердить слово' : key === '⌫' ? 'Стереть букву' : key);
         if (!action) {
           const sectors = el('span', 'key-sectors');
           sectors.setAttribute('aria-hidden', 'true');
           sectors.append(...Array.from({length: 4}, () => el('i')));
-          btn.append(sectors, el('span', 'key-letter', key)); keyElements.set(key, btn);
-        } else btn.innerHTML = keyIcons[key];
-        line.append(btn);
+          face.append(sectors, el('span', 'key-letter', key));
+          keyElements.set(key, {btn, sectors});
+        } else face.innerHTML = keyIcons[key];
+        btn.append(face);
+        slot.append(btn);
+        line.append(slot);
       }
       $('keyboard').append(line);
     }
   }
   function drawKeys(boards) {
-    for (const [letter, btn] of keyElements) {
+    for (const [letter, {btn, sectors}] of keyElements) {
       // После закрытия поля сервер сохраняет подсказки последнего принятого им хода.
       const parts = boards.map(b => b.keyboard?.[letter] || '');
       const lightParts = parts.filter(p => p === 'present' || p === 'correct').length;
       btn.dataset.ink = lightParts === 4 ? 'dark' : lightParts ? 'mixed' : 'light';
-      Array.from(btn.firstElementChild.children).forEach((part, i) => { part.dataset.color = parts[i]; });
+      Array.from(sectors.children).forEach((part, i) => { part.dataset.color = parts[i]; });
       btn.setAttribute('aria-label', letter + ': ' + parts.map((p, i) => names[i] + ' — ' + colors[p]).join('; '));
     }
   }
@@ -369,8 +374,9 @@
         node.setAttribute('aria-controls', 'definition-popover');
       }
       if (b.solved) {
-        const check = el('span', 'result-check');
-        check.innerHTML = keyIcons['↵']; node.append(check);
+        const check = el('span', 'result-check', '✓');
+        check.setAttribute('aria-hidden', 'true');
+        node.append(check);
       }
       node.append(el('span', 'result-word', b.answer || '—'));
       return node;

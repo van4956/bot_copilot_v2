@@ -7,7 +7,6 @@ import json
 import re
 import secrets
 import unicodedata
-from collections import Counter
 from datetime import date, datetime, time, timedelta, timezone
 from math import floor, gcd, sqrt
 from pathlib import Path
@@ -62,22 +61,17 @@ def normalize_draft(value: str) -> str:
 
 
 def evaluate_guess(answer: str, guess: str) -> list[str]:
-    """Сначала отмечает точные позиции, затем оставшиеся совпадения букв."""
+    """Проверяет позицию и наличие каждой буквы без ограничения повторов."""
     answer = normalize_word(answer)
     guess = normalize_word(guess)
-    states = ["absent"] * WORD_LENGTH
-    remaining: Counter[str] = Counter()
-    for index, (expected, entered) in enumerate(zip(answer, guess)):
+    states = []
+    for expected, entered in zip(answer, guess):
         if expected == entered:
-            states[index] = "correct"
+            states.append("correct")
+        elif entered in answer:
+            states.append("present")
         else:
-            remaining[expected] += 1
-    for index, entered in enumerate(guess):
-        if states[index] == "correct":
-            continue
-        if remaining[entered]:
-            states[index] = "present"
-            remaining[entered] -= 1
+            states.append("absent")
     return states
 
 

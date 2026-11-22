@@ -1,0 +1,3 @@
+# HTTP API, общий словарь и уведомления Telegram, без polling и тестового бота.
+-r requirements-wordli.txt
+aiogram==3.33.0

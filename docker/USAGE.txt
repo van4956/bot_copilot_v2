@@ -6,6 +6,7 @@ Docker-конфигурация Copilot
 Рабочие проекты и ресурсы сохраняют прежние имена:
 - bot_04_copilot_v2: bot, db, redis; тома postgres_data и redis_data.
 - copilot-wordli: только wordliapi.
+- copilot-quordle: только quordleapi (127.0.0.1:8795); отдельная БД в том же PostgreSQL.
 - сети bot_copilot_net и bot_copilot_backend не переименовываются.
 
 Проверка конфигурации без запуска:
@@ -18,8 +19,13 @@ docker compose --env-file .env -f docker/docker-compose.yml config --quiet
 WORDLI_ENV_FILE=/etc/copilot/wordli.env docker compose --env-file /etc/copilot/wordli.env -f docker/docker-compose.wordli.yml config --quiet
 
 Сборка из корня проекта при отдельно согласованном выпуске:
-docker build -f docker/Dockerfile -t copilot-bot:RELEASE .
+docker build -f docker/Dockerfile -t bot_04_copilot_v2-bot:RELEASE .
 docker build -f docker/Dockerfile.wordli -t copilot-wordli:RELEASE .
+docker build -f docker/Dockerfile.quordle -t copilot-quordle:RELEASE .
+
+Для выбора проверенного тега: COPILOT_IMAGE_TAG, WORDLI_IMAGE_TAG, QUORDLE_IMAGE_TAG.
+Для новой игры требуется QUORDLE_ENV_FILE (абсолютный путь к защищённому env).
+Миграция, обратный прокси /quordle/, проверки и откат: deployment/quordle/README.md.
 
 Контекст сборки — корень репозитория. Для каждого production Dockerfile
 его собственный .dockerignore лежит рядом с ним в docker/.

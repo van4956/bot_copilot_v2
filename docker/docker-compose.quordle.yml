@@ -1,0 +1,45 @@
+name: copilot-quordle
+
+services:
+  quordleapi:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.quordle
+    image: copilot-quordle:${QUORDLE_IMAGE_TAG:-local}
+    env_file:
+      - ${QUORDLE_ENV_FILE:?Set QUORDLE_ENV_FILE to the protected production env file}
+    environment:
+      APP_ENV: production
+    ports:
+      - "127.0.0.1:8795:8795"
+    networks: [backend, egress]
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=1700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8795/health',timeout=4)).get('ok') is True"
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    mem_limit: 256m
+    cpus: "0.50"
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: true
+    name: bot_copilot_backend
+  egress:
+    driver: bridge

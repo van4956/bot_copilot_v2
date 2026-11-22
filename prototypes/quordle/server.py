@@ -1,4 +1,4 @@
-"""Закрытый локальный сервер Mini App КВОРДЛИ для тестового бота."""
+"""Общий HTTP API КВОРДЛИ и отдельный запуск для локального тестового бота."""
 
 from __future__ import annotations
 
@@ -24,7 +24,6 @@ from prototypes.wordli.definitions import StaticDefinitionCatalog
 from prototypes.wordli.engine import normalize_word
 from prototypes.wordli.telegram_auth import validate_init_data
 
-from .demo_bot import load_test_identity, verify_test_bot
 from .engine import GameError, QuordleEngine
 from .storage import TEST_DATABASE, Player, RevisionConflict, Storage
 
@@ -49,10 +48,10 @@ def json_response(payload: dict[str, Any], status: int = 200) -> web.Response:
     )
 
 
-def telegram_player(raw: str, token: str, allowed: set[int]) -> Player:
+def telegram_player(raw: str, token: str, allowed: set[int] | None) -> Player:
     """Читает публичное имя только после проверки подписи Telegram."""
     identity = validate_init_data(raw, token)
-    if identity.user_id not in allowed:
+    if allowed is not None and identity.user_id not in allowed:
         raise GameError("forbidden", "Доступ к тестовой игре ограничен.", 403)
     user = json.loads(parse_qs(raw)["user"][0])
     parts = [user.get("first_name"), user.get("last_name")]
@@ -99,15 +98,24 @@ def create_app(
     token: str = "",
     allowed: set[int] | None = None,
     preview: bool = False,
+    production: bool = False,
 ) -> web.Application:
     """Собирает HTTP API с разрешённым origin и закрытым набором файлов."""
     host = urlsplit(origin).netloc
+    if production and (preview or allowed is not None or not token):
+        raise ValueError("Несовместимые настройки рабочего API КВОРДЛИ.")
+    permitted = None if production else set(allowed or ())
 
     async def health(request: web.Request) -> web.Response:
         """Проверяет только выделенную БД."""
         try:
-            await storage.pool.fetchval("select 1")
-        except (OSError, asyncpg.PostgresError):
+            if production:
+                await storage.pool.fetchval(
+                    "select 1 from public.quordle_players limit 0", timeout=3
+                )
+            else:
+                await storage.pool.fetchval("select 1")
+        except (OSError, asyncio.TimeoutError, asyncpg.PostgresError):
             return json_response({"ok": False}, 503)
         return json_response({"ok": True})
 
@@ -152,7 +160,7 @@ def create_app(
             else:
                 values = request.headers.getall("X-Telegram-Init-Data", [])
                 raw = values[0] if len(values) == 1 else ""
-                player = telegram_player(raw, token, allowed or set())
+                player = telegram_player(raw, token, permitted)
             try:
                 payload = await request.json()
             except (ValueError, TypeError, web.HTTPException, RecursionError):
@@ -186,6 +194,10 @@ def create_app(
                 "error": error.code, "message": error.message, "state": error.state,
             }, 409)
         except GameError as error:
+            if production and error.code == "authentication_failed":
+                return json_response({
+                    "error": error.code, "message": "Откройте игру заново через бота.",
+                }, error.status)
             return json_response({
                 "error": error.code, "message": error.message,
             }, error.status)
@@ -207,6 +219,8 @@ async def initialise_connection(connection: asyncpg.Connection) -> None:
 
 async def run(origin: str, port: int, preview: bool) -> None:
     """Подключается только к локальной тестовой БД, затем поднимает HTTP."""
+    from .demo_bot import load_test_identity, verify_test_bot
+
     pg = dotenv_values(PG_FILE, interpolate=False)
     if (
         pg.get("POSTGRES_DB") != TEST_DATABASE

@@ -109,6 +109,7 @@ celerybeat.pid
 
 # SQL dump
 *.sql
+!prototypes/quordle/migrations/001_initial.sql
 !testing/postgres-app.sql
 !database/migrations/*.sql
 

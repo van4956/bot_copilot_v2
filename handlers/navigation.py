@@ -78,7 +78,7 @@ async def _words_button(message: Message, bot: Bot | None = None) -> bool:
         return True
     active_bot = bot if bot is not None else getattr(message, "bot", None)
     return (
-        keyboard.wordli_enabled(active_bot)
+        keyboard.games_enabled(active_bot)
         and message.text in {
             legacy_label.removesuffix(" 🧩"),
             legacy_label.removesuffix(" 🧩") + " 🕹",
@@ -93,15 +93,24 @@ async def open_words(
     """Открывает выбор разрешённых игр или прежнюю заглушку."""
     await reset_dialog(state)
     active_bot = bot if bot is not None else getattr(message, "bot", None)
-    url = getattr(active_bot, "wordli_webapp_url", "")
+    games: list[InlineKeyboardButton] = []
     if keyboard.wordli_enabled(active_bot):
+        games.append(
+            InlineKeyboardButton(
+                text="5БУКВ", web_app=WebAppInfo(url=active_bot.wordli_webapp_url),
+            )
+        )
+    if keyboard.quordle_enabled(active_bot):
+        games.append(
+            InlineKeyboardButton(
+                text="КВОРДЛИ",
+                web_app=WebAppInfo(url=active_bot.quordle_webapp_url),
+            )
+        )
+    if games:
         markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="5БУКВ", web_app=WebAppInfo(url=url)
-                    ),
-                ],
+                games,
                 [
                     InlineKeyboardButton(
                         text=_("Назад на главную ↩️"),
@@ -221,7 +230,7 @@ async def back_from_wordli(
     """Удаляет приглашение игры и возвращает главную панель."""
     active_bot = bot if bot is not None else getattr(callback, "bot", None)
     if (
-        not keyboard.wordli_enabled(active_bot)
+        not keyboard.games_enabled(active_bot)
         or not isinstance(callback.message, Message)
     ):
         await callback.answer(
