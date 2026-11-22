@@ -609,9 +609,12 @@ button:focus-visible {
 .progress-point svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .progress-word { min-height: 17px; max-width: 100%; color: #aaa; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .progress-word--interactive {
+  --word-highlight: transparent;
   position: relative;
-  background: transparent;
-  border-radius: 3px;
+  background: var(--word-highlight);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px var(--word-highlight);
+  text-decoration: none;
   -webkit-appearance: none;
   appearance: none;
 }
@@ -624,16 +627,12 @@ button:focus-visible {
 
 .progress-word--interactive[aria-expanded="true"],
 .progress-word--interactive:focus-visible {
-  text-decoration: underline;
-  text-decoration-color: #8d8d8d;
-  text-underline-offset: 4px;
+  --word-highlight: #383838;
 }
 
 @media (hover: hover) {
   .progress-word--interactive:hover {
-    text-decoration: underline;
-    text-decoration-color: #8d8d8d;
-    text-underline-offset: 4px;
+    --word-highlight: #383838;
   }
 }
 
@@ -644,7 +643,7 @@ button:focus-visible {
   padding: 18px 20px 16px;
   overflow: auto;
   overscroll-behavior: contain;
-  border: 1px solid #494949;
+  border: 0;
   border-radius: 16px;
   background: #303030;
   color: var(--text);
