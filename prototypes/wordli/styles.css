@@ -293,6 +293,15 @@ button:focus-visible {
   background: var(--tile-absent);
 }
 
+.key-slot--action .key:disabled { cursor: default; }
+.key-slot--action .key:disabled .key-face {
+  border-color: var(--tile-absent);
+  color: var(--white);
+  background: var(--tile-absent);
+  filter: none;
+  transform: none;
+}
+
 .key--enter svg { width: 27px; height: 27px; }
 
 .key:active .key-face {

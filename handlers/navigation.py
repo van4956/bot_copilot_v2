@@ -4,7 +4,7 @@ import json
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command, or_f
+from aiogram.filters import Command, CommandObject, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
@@ -88,7 +88,10 @@ async def _words_button(message: Message, bot: Bot | None = None) -> bool:
 
 @navigation_router.message(_words_button)
 async def open_words(
-    message: Message, state: FSMContext, bot: Bot | None = None
+    message: Message,
+    state: FSMContext,
+    bot: Bot | None = None,
+    command: CommandObject | None = None,
 ) -> None:
     """Открывает выбор разрешённых игр или прежнюю заглушку."""
     await reset_dialog(state)
@@ -123,9 +126,12 @@ async def open_words(
             "🕹", parse_mode=None,
             reply_markup=ReplyKeyboardRemove(remove_keyboard=True),
         )
-        invitation = with_game_language_notice(
-            _("В какую игру сыграем?"), get_i18n().current_locale, _,
-        )
+        invitation = _("В какую игру сыграем?")
+        # Фильтр Command передаёт command для /quordle, кнопка меню — нет.
+        if command is None:
+            invitation = with_game_language_notice(
+                invitation, get_i18n().current_locale, _,
+            )
         await message.answer(invitation, reply_markup=markup)
         return
     await message.answer(

@@ -13,7 +13,11 @@
   const names = ['верхнее левое', 'верхнее правое', 'нижнее левое', 'нижнее правое'];
   const colors = {correct: 'на месте', present: 'есть', absent: 'нет', '': 'неизвестно'};
   const priority = {'': 0, absent: 1, present: 2, correct: 3};
+  const statDecimal = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 1, maximumFractionDigits: 1,
+  });
   const keyElements = new Map();
+  const actionKeys = new Map();
   // Те же линейные пиктограммы, что на клавиатуре «5БУКВ».
   const keyIcons = {
     '↵': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>',
@@ -59,6 +63,18 @@
   function hideToast() { $('toast').className = 'toast'; }
   function active() { return state?.game?.status === 'in_progress'; }
   function finished() { return ['won', 'lost', 'expired'].includes(state?.game?.status); }
+  function canEdit() { return active() && !busy && screen === 'game'; }
+  function draftLetterCount() { return cells.filter(letter => /^[А-Я]$/u.test(letter)).length; }
+  function drawActionKeys() {
+    const ready = canEdit();
+    const count = draftLetterCount();
+    actionKeys.get('↵').disabled = !ready || count !== 5;
+    actionKeys.get('⌫').disabled = !ready || count === 0;
+  }
+  function setBusy(value) {
+    busy = value;
+    drawActionKeys();
+  }
   function apply(next, preserve = false) {
     if (!next?.game || !Number.isInteger(next.revision)) throw new Error('Не удалось прочитать состояние игры.');
     state = next;
@@ -76,6 +92,7 @@
     document.body.dataset.screen = name;
     for (const section of sectionNames) $(section + '-screen').hidden = section !== name;
     document.querySelector('.app-shell').classList.toggle('app-shell--closed', name === 'closed');
+    drawActionKeys();
     window.scrollTo(0, 0);
     if (name === 'stats') renderStats();
     if (name === 'settings') renderSettings();
@@ -142,13 +159,17 @@
           sectors.append(...Array.from({length: 4}, () => el('i')));
           face.append(sectors, el('span', 'key-letter', key));
           keyElements.set(key, {btn, sectors});
-        } else face.innerHTML = keyIcons[key];
+        } else {
+          face.innerHTML = keyIcons[key];
+          actionKeys.set(key, btn);
+        }
         btn.append(face);
         slot.append(btn);
         line.append(slot);
       }
       $('keyboard').append(line);
     }
+    drawActionKeys();
   }
   function drawKeys(boards) {
     for (const [letter, {btn, sectors}] of keyElements) {
@@ -164,6 +185,7 @@
     if (!state) return;
     drawBoards();
     drawKeys(state.game.boards);
+    drawActionKeys();
     if (screen === 'stats') renderStats();
     if (screen === 'settings') renderSettings();
   }
@@ -199,8 +221,9 @@
   }
   function clearInvalid() { invalid = false; hideToast(); }
   function input(key) {
-    if (!active() || busy || screen !== 'game') return;
+    if (!canEdit()) return;
     if (key === '↵') { submit(); return; }
+    if (key === '⌫' && draftLetterCount() === 0) return;
     clearInvalid();
     if (key === '⌫') {
       if (cells[cursor] === ' ' && cursor > 0) cursor--;
@@ -209,7 +232,7 @@
       if (!/^[А-ЯЁ]$/u.test(key)) return;
       cells[cursor] = key.replace('Ё', 'Е'); cursor = Math.min(cursor + 1, 4);
     }
-    drawBoards(); scheduleDraft();
+    drawBoards(); drawActionKeys(); scheduleDraft();
   }
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   async function reveal(before, after) {
@@ -246,12 +269,9 @@
     setTimeout(() => $('confetti').replaceChildren(), 3200);
   }
   async function submit() {
-    if (busy || !active()) return;
+    if (!canEdit() || draftLetterCount() !== 5) return;
     const word = cells.join('');
-    if (!/^[А-Я]{5}$/u.test(word)) {
-      invalid = true; drawBoards(); notify('Введите пять букв.', true); return;
-    }
-    busy = true; clearTimeout(draftTimer); clearInvalid();
+    setBusy(true); clearTimeout(draftTimer); clearInvalid();
     const round = state.game.id;
     await serialize(async () => {
       if (!active() || round !== state.game.id || cells.join('') !== word) return;
@@ -269,22 +289,25 @@
       invalid = err.status === 400 || err.status === 422;
       drawBoards(); notify(err.message, invalid);
       if (invalid) scheduleDraft();
-    }).catch(err => notify(err.message)).finally(() => { busy = false; });
+    }).catch(err => notify(err.message)).finally(() => { setBusy(false); });
   }
   async function nextGame() {
     if (!finished() || busy) return;
-    busy = true;
+    setBusy(true);
     try {
       await serialize(async () => { apply(await api('next', {revision: state.revision, request_id: crypto.randomUUID()})); home(); });
     } catch (err) { if (!await recover(err)) notify(err.message); }
-    finally { busy = false; }
+    finally { setBusy(false); }
   }
   function renderStats() {
     if (!state) return;
     const stats = state.stats;
+    const allWon = stats.played > 0 && stats.wins === stats.played;
+    // После любого поражения округление не должно показывать 100%.
+    const winRate = allWon ? '100%' : `${statDecimal.format(Math.min(stats.win_rate, 99.9))}%`;
     const data = {
-      played: stats.played, 'win-rate': Math.round(stats.win_rate) + '%',
-      average: stats.average == null ? '—' : stats.average.toLocaleString('ru', {maximumFractionDigits: 2}),
+      played: stats.played, 'win-rate': winRate,
+      average: stats.average == null ? '—' : statDecimal.format(stats.average),
       'win-streak': stats.win_streak, 'max-streak': stats.max_streak, score: stats.score ?? '—',
     };
     for (const node of document.querySelectorAll('[data-stat]')) node.textContent = data[node.dataset.stat];
@@ -373,12 +396,12 @@
         node.type = 'button'; node.dataset.word = b.answer; node.setAttribute('aria-expanded', 'false');
         node.setAttribute('aria-controls', 'definition-popover');
       }
-      if (b.solved) {
-        const check = el('span', 'result-check', '✓');
-        check.setAttribute('aria-hidden', 'true');
-        node.append(check);
+      const marker = el('span', 'result-marker', b.solved ? '✓' : null);
+      if (!b.solved) {
+        marker.innerHTML = '<svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>';
       }
-      node.append(el('span', 'result-word', b.answer || '—'));
+      marker.setAttribute('aria-hidden', 'true');
+      node.append(marker, el('span', 'result-word', b.answer || '—'));
       return node;
     });
     $('result-cards').replaceChildren(...cards);
@@ -393,10 +416,11 @@
     const pop = $('definition-popover');
     const target = anchor.getBoundingClientRect();
     const W = document.documentElement.clientWidth, H = window.innerHeight;
-    pop.style.width = Math.min(344, W - 20) + 'px';
+    const width = Math.min(344, W - 20);
+    pop.style.width = width + 'px';
     pop.style.maxHeight = Math.max(100, H - 20) + 'px';
-    const {width, height} = pop.getBoundingClientRect();
-    const left = Math.min(W - width - 10, Math.max(10, target.left + (target.width - width) / 2));
+    const {height} = pop.getBoundingClientRect();
+    const left = Math.max(10, Math.min(W - width - 10, target.left + (target.width - width) / 2));
     const top = target.bottom + height + 10 <= H ? target.bottom + 5 : Math.max(10, target.top - height - 5);
     pop.style.left = left + 'px'; pop.style.top = top + 'px';
   }
@@ -456,13 +480,14 @@
   $('keyboard').addEventListener('mousedown', event => event.preventDefault());
   document.addEventListener('pointerover', event => {
     if (!hoverCapable.matches || event.pointerType === 'touch') return;
-    const btn = event.target.closest?.('[data-word]');
+    const btn = event.target.closest?.('.result-word')?.closest('[data-word]');
     if (btn) { clearTimeout(hoverTimer); hoverTimer = setTimeout(() => openDefinition(btn), 140); }
     if (event.target.closest?.('#definition-popover')) clearTimeout(hoverTimer);
   });
   document.addEventListener('pointerout', event => {
     if (!hoverCapable.matches || event.pointerType === 'touch') return;
-    if (event.target.closest?.('[data-word],#definition-popover') && !event.relatedTarget?.closest?.('[data-word],#definition-popover')) {
+    const hoverArea = '.result-word, #definition-popover';
+    if (event.target.closest?.(hoverArea) && !event.relatedTarget?.closest?.(hoverArea)) {
       clearTimeout(hoverTimer); hoverTimer = setTimeout(closeDefinition, 260);
     }
   });

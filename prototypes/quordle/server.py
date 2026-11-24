@@ -7,15 +7,16 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import asyncpg
 from aiogram import Bot
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiohttp import web
 from dotenv import dotenv_values
@@ -33,11 +34,12 @@ PG_FILE = ROOT / "local_testing/data/quordle-runtime/postgres.env"
 ASSETS = {"index.html", "quordle.js", "quordle.css"}
 TUNNEL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com\Z")
 LOGGER = logging.getLogger(__name__)
+REMINDER_POLL_INTERVAL = 15
 NOTICE = {
     "ru": ("Готова новая партия в КВОРДЛИ 🧩", "Играть"),
-    "en": ("A new КВОРДЛИ puzzle is ready 🧩 (Russian words)", "Play"),
-    "es": ("Nueva partida de КВОРДЛИ 🧩 (palabras en ruso)", "Jugar"),
-    "uk": ("Нова партія КВОРДЛІ 🧩 (слова російською)", "Грати"),
+    "en": ("A new КВОРДЛИ puzzle is ready 🧩", "Play"),
+    "es": ("Nueva partida de КВОРДЛИ 🧩", "Jugar"),
+    "uk": ("Нова партія КВОРДЛІ 🧩", "Грати"),
 }
 
 
@@ -64,30 +66,58 @@ def telegram_player(raw: str, token: str, allowed: set[int] | None) -> Player:
     return Player(identity.user_id, name, locale if locale in NOTICE else "ru")
 
 
-async def notify_players(storage: Storage, bot: Bot, origin: str) -> None:
-    """Отправляет только включённые сообщения в утреннее окно игрока."""
-    keyboard = {
-        locale: InlineKeyboardMarkup(inline_keyboard=[[
+def _utc_now() -> datetime:
+    """Возвращает текущее время для проверки каждого адресата."""
+    return datetime.now(timezone.utc)
+
+
+async def notify_due(
+    storage: Storage,
+    bot: Bot,
+    origin: str,
+    allowed: set[int] | None = None,
+    clock: Callable[[], datetime] = _utc_now,
+) -> None:
+    """Обрабатывает один утренний обход; неопределённую доставку не повторяет."""
+    for user_id in await storage.reminder_candidates(clock(), allowed):
+        claim = await storage.claim_reminder(user_id, clock(), allowed)
+        if claim is None:
+            continue
+        text, label = NOTICE.get(claim.locale, NOTICE["ru"])
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text=label, web_app=WebAppInfo(url=origin))
         ]])
-        for locale, (_, label) in NOTICE.items()
-    }
-    while True:
         try:
-            now = datetime.now(timezone.utc)
-            for player in await storage.claim_reminders(now):
-                locale = player["locale"] if player["locale"] in NOTICE else "ru"
-                try:
-                    await bot.send_message(
-                        player["user_id"],
-                        NOTICE[locale][0],
-                        reply_markup=keyboard[locale],
-                    )
-                except Exception as error:
-                    LOGGER.warning("Напоминание не отправлено: %s", type(error).__name__)
+            await bot.send_message(user_id, text, reply_markup=keyboard, request_timeout=10)
+        except TelegramRetryAfter as error:
+            # Telegram явно отказал. Не повторяем до его срока или вне окна.
+            delay = max(1, error.retry_after)
+            await storage.finish_reminder(
+                claim, "retry", clock() + timedelta(seconds=delay)
+            )
+        except TelegramForbiddenError:
+            await storage.finish_reminder(claim, "blocked")
+        except Exception as error:
+            # Сетевой сбой может означать доставку без ответа: повтор опасен.
+            LOGGER.warning("Доставка напоминания не подтверждена: %s", type(error).__name__)
+            await storage.finish_reminder(claim, "failed")
+        else:
+            await storage.finish_reminder(claim, "sent")
+
+
+async def notify_players(
+    storage: Storage, bot: Bot, origin: str, allowed: set[int] | None = None
+) -> None:
+    """Проверяет добровольные напоминания до остановки HTTP-сервера."""
+    loop = asyncio.get_running_loop()
+    while True:
+        started = loop.time()
+        try:
+            await notify_due(storage, bot, origin, allowed)
         except Exception as error:
             LOGGER.warning("Напоминания недоступны: %s", type(error).__name__)
-        await asyncio.sleep(60)
+        # Время обработки входит в интервал, обходы не накладываются.
+        await asyncio.sleep(max(0.0, REMINDER_POLL_INTERVAL - (loop.time() - started)))
 
 
 def create_app(
@@ -252,7 +282,7 @@ async def run(origin: str, port: int, preview: bool) -> None:
                 """Проверяет личность бота и завершает обработчик уведомлений."""
                 async with Bot(token=token) as bot:
                     await verify_test_bot(bot, expected)
-                    worker = asyncio.create_task(notify_players(storage, bot, origin))
+                    worker = asyncio.create_task(notify_players(storage, bot, origin, allowed))
                     try:
                         yield
                     finally:

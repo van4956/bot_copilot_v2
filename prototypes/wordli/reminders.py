@@ -19,7 +19,6 @@ from .bot_texts import (
     REMINDER_BACK_TEXT,
     REMINDER_TEXT,
     normalize_game_locale,
-    with_game_language_notice,
 )
 
 if TYPE_CHECKING:
@@ -108,9 +107,7 @@ class TelegramReminderSender:
                 self._url,
                 json={
                     "chat_id": user_id,
-                    "text": with_game_language_notice(
-                        translate(REMINDER_TEXT), locale, translate
-                    ),
+                    "text": translate(REMINDER_TEXT),
                     "reply_markup": reply_markup,
                 },
                 allow_redirects=False,

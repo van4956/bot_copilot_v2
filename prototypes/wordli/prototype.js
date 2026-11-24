@@ -59,6 +59,13 @@
         return empty < 0 ? WORD_LENGTH - 1 : empty;
     }
 
+    /** Проверяет только набранные буквы: подсказки в черновик не входят. */
+    function canApplyInput(draft, action) {
+        if (action === 'submit') return /^[А-Я]{5}$/u.test(draft);
+        if (action === 'delete' || action === 'clear') return /[А-Я]/u.test(draft);
+        return action === 'letter';
+    }
+
     /** Меняет одну позицию, не сдвигая остальные буквы активной строки. */
     function editDraftCells(draft, cursor, action, letter = '') {
         const cells = draft.padEnd(WORD_LENGTH, ' ').split('');
@@ -847,6 +854,7 @@
             key.disabled = !state || client.busy || Boolean(state.game.outcome)
                 || state.game.status === 'exhausted' || (action === 'enter' && revealActive);
             if (action) {
+                key.disabled ||= !canApplyInput(state?.game.draft || '', action === 'enter' ? 'submit' : action);
                 key.classList.add(`key--${action}`);
                 key.dataset.keyAction = action;
                 key.setAttribute('aria-label', action === 'enter' ? 'Подтвердить слово' : 'Удалить букву');
@@ -1153,6 +1161,11 @@
             try {
                 while (inputQueue.length && !client.busy && !state.game.outcome) {
                     const next = inputQueue[0];
+                    // Сначала выполняются набранные ранее буквы, даже при быстром вводе.
+                    if (!canApplyInput(state.game.draft, next.action)) {
+                        inputQueue.shift();
+                        continue;
+                    }
                     if (next.action === 'submit' && revealActive) break;
                     inputQueue.shift();
                     if (next.action === 'submit') submitNow();
@@ -1180,10 +1193,6 @@
         function submitNow() {
             if (!state || client.busy || state.game.outcome || screen !== 'game') return;
             clearMessage(true);
-            if (!/^[А-Я]{5}$/u.test(state.game.draft)) {
-                showMessage('Введите пять букв');
-                return;
-            }
             client.submit().catch(error => {
                 if (['unknown_word', 'invalid_word'].includes(error.code)) showWordError();
                 else showMessage(error.message);
@@ -1305,7 +1314,7 @@
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             STORAGE_KEY, LocalApiError, initialScreen, normalizeDraft, parseSavedHistory,
-            correctHints, draftCursor, editDraftCells, browserTimezone, validateLeaderboard,
+            correctHints, draftCursor, canApplyInput, editDraftCells, browserTimezone, validateLeaderboard,
             LEADERBOARD_NAME_LIMIT, formatLeaderboardName,
             createHistoryStore, preserveStorageWarning, validateState, requestApi, createGameClient, formatStatistics,
             gameIdentity, formatProgressWord, createProgressWord, formatScoreDelta, shouldCelebrate, formatCountdown, mount,

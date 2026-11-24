@@ -189,10 +189,8 @@ msgid "Игры 🕹"
 msgstr "Juegos 🕹"
 
 #: prototypes/wordli/bot_texts.py:12
-msgid "Из-за особенностей механики игры игра пока доступна только на русском языке"
-msgstr ""
-"Por las características de su mecánica, el juego está disponible por ahora solo en "
-"ruso"
+msgid "Игры доступны только на русском языке"
+msgstr "Estos juegos solo están disponibles en ruso"
 
 #: handlers/other.py:64
 msgid "Информация"

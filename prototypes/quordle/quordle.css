@@ -8,6 +8,7 @@
   --white: #ffffff;
   --text: #f5f5f5;
   --muted: #b6b6b6;
+  --attempts-denominator: #707070;
   --line: #444444;
   --key-height: 52px;
   --key-gap: 6px;
@@ -279,7 +280,7 @@ button:focus-visible {
 
 .key--correct .key-face,
 .key[data-state="correct"] .key-face,
-.key--enter .key-face {
+.key--enter:not(:disabled) .key-face {
   border-color: var(--yellow);
   color: #262626;
   background: var(--yellow);
@@ -287,7 +288,7 @@ button:focus-visible {
 
 .key--present .key-face,
 .key[data-state="present"] .key-face,
-.key--delete .key-face {
+.key--delete:not(:disabled) .key-face {
   border-color: var(--white);
   color: #262626;
   background: var(--white);
@@ -297,6 +298,14 @@ button:focus-visible {
 .key[data-state="absent"] .key-face {
   border-color: var(--tile-absent);
   background: var(--tile-absent);
+}
+
+.key-slot--action .key:disabled .key-face {
+  border-color: var(--tile-absent);
+  background: var(--tile-absent);
+  color: var(--white);
+  filter: none;
+  transform: none;
 }
 
 .key--enter svg { width: 27px; height: 27px; }
@@ -591,12 +600,13 @@ button:focus-visible {
 .rule-tile--absent { color: var(--text); background: var(--tile-absent); }
 
 .screen--summary {
+  --result-text-size: 18px;
   padding-top: 25px;
   text-align: center;
 }
 
 .summary-title { margin: 0 0 14px; font-size: 30px; font-weight: 500; line-height: 1.25; }
-.summary-text { min-height: 24px; margin: 0; color: #bcbcbc; font-size: 18px; line-height: 1.4; }
+.summary-text { min-height: 24px; margin: 0; color: #bcbcbc; font-size: var(--result-text-size); line-height: 1.4; }
 
 .definition-popover {
   position: fixed;
@@ -670,7 +680,7 @@ button:focus-visible {
 .attempts-card p { margin: 0 0 19px; color: #c4c4c4; font-size: 20px; line-height: 1.4; }
 .attempts-value { font-size: 70px; font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; }
 .attempts-value strong { color: var(--yellow); font-weight: 400; }
-.attempts-value span { color: #707070; }
+.attempts-value span { color: var(--attempts-denominator); }
 
 .screen--closed {
   display: flex;
@@ -878,18 +888,48 @@ body[data-screen="game"] .app-shell {
 .key[data-ink="mixed"] .key-letter { text-shadow: -1px -1px 0 #252525, 1px -1px 0 #252525, -1px 1px 0 #252525, 1px 1px 0 #252525; }
 .key:disabled { cursor: default; }
 .result-cards { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin: 36px 0 32px; }
-.result-card { --result-word-neutral: #c2c2c2; min-height: 56px; border: 0; border-radius: 26px; display: flex; justify-content: center; align-items: center; gap: 7px;
-  padding: 12px 6px; background: var(--surface); color: var(--result-word-neutral); font-size: clamp(16px, 4.2vw, 20px); line-height: 1.25; }
-.result-card--solved { --result-word-highlight: var(--result-word-neutral); background: var(--yellow); color: #242424; font-weight: 500; }
-button.result-card:is(:active, :focus-visible, [aria-expanded="true"]) {
-  color: var(--result-word-highlight, var(--white));
+.result-card {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 3vw, 14px);
+  background: transparent;
+  color: var(--white);
+  text-align: left;
+  font-size: var(--result-text-size);
+  line-height: 1.25;
+}
+.result-card--solved { font-weight: 500; }
+.result-marker {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: clamp(36px, 12vw, 55px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: var(--attempts-denominator);
+  background: var(--surface);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+.result-card--solved .result-marker { color: #242424; background: var(--yellow); }
+.result-marker svg {
+  width: 1.18em;
+  height: 1.18em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+button.result-card:is(:active, :focus-visible, [aria-expanded="true"]) .result-word {
+  color: var(--muted);
 }
 @media (hover: hover) {
-  button.result-card:hover { color: var(--result-word-highlight, var(--white)); }
+  button.result-card .result-word:hover { color: var(--muted); }
 }
-.result-check { flex: none; font-size: 22px; font-weight: 400; line-height: 1; }
 @media (max-width: 350px) {
-  .result-check { font-size: 20px; }
+  .result-marker { font-size: 20px; }
 }
 .score-formula { line-height: 1.45; font-variant-numeric: tabular-nums; }
 .leaderboard-label { text-overflow: ellipsis; }

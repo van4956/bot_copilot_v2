@@ -1,8 +1,9 @@
 """Проверки тестового меню полного Copilot без вызовов Telegram."""
 
 import unittest
+from contextlib import ExitStack
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 from aiogram.methods import SendMessage
 from aiogram.types import (
@@ -17,6 +18,7 @@ from aiogram.utils.i18n import I18n
 from common.keyboard import start_keyboard
 from config_data.config import ROOT
 
+from . import full_test_bot
 from .full_test_bot import TwoGamesMenu
 
 WORDLI = "https://wordli.trycloudflare.com"
@@ -29,6 +31,50 @@ class GamesMenuTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         """Готовит адаптер и два адреса без токенов."""
         self.menu = TwoGamesMenu(WORDLI, QUORDLE, {10})
+
+    async def test_startup_never_overrides_weather_or_currency(self) -> None:
+        """С ключами и без них подключается лишь меню, но не подмены сервисов."""
+        for key in ("", "unit-test-key"):
+            with self.subTest(has_keys=bool(key)), ExitStack() as stack:
+                config = SimpleNamespace(
+                    wordli_webapp_url=WORDLI,
+                    tg_bot=SimpleNamespace(api_weather=key, api_currency=key),
+                )
+                stub = stack.enter_context
+                stub(patch.object(
+                    full_test_bot, "load_test_identity", return_value=("mock", 42, {10}),
+                ))
+                stub(patch.object(
+                    full_test_bot, "load_isolated_config", return_value=config,
+                ))
+                client = stub(patch.object(full_test_bot, "Bot"))
+                api = client.return_value.__aenter__.return_value
+                api.get_webhook_info.return_value = SimpleNamespace(url=None)
+                stub(patch.object(
+                    full_test_bot, "verify_test_bot", new_callable=AsyncMock,
+                ))
+                stub(patch(
+                    "local_testing.testing.local_bootstrap.configure_local_fixtures"
+                ))
+                router = stub(patch.object(
+                    full_test_bot.navigation, "navigation_router",
+                ))
+                stub(patch.object(full_test_bot.app, "main", new_callable=AsyncMock))
+                stub(patch("builtins.print"))
+
+                await full_test_bot.run(QUORDLE, check_only=False)
+                install_menu = router.startup.register.call_args.args[0]
+                bot = SimpleNamespace(test_mode=True, id=42, session=Mock())
+                await install_menu(bot)
+
+                bot.session.middleware.assert_called_once()
+                installed = bot.session.middleware.call_args.args[0]
+                self.assertIsInstance(installed, TwoGamesMenu)
+                for name in (
+                    "weather_provider", "weather_credits",
+                    "currency_provider", "currency_attribution",
+                ):
+                    self.assertFalse(hasattr(bot, name), name)
 
     def test_menu_links_and_back_button(self) -> None:
         """Добавляет соседнюю игру, не изменяя штатную кнопку возврата."""

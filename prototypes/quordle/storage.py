@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
+from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import asyncpg
@@ -49,6 +50,33 @@ class Player:
     user_id: int
     name: str
     locale: str = "ru"
+
+
+@dataclass(frozen=True, slots=True)
+class ReminderClaim:
+    """Связывает ответ Telegram с одной попыткой утренней рассылки."""
+
+    user_id: int
+    locale: str
+    day: date
+    token: str
+
+
+def _reminder_day(now: datetime, user_id: int, zone: str) -> date | None:
+    """Раскладывает личные слоты по утреннему окну в местном часовом поясе."""
+    if now.utcoffset() is None:
+        raise ValueError("Для напоминаний нужны часы с часовым поясом.")
+    try:
+        local = now.astimezone(ZoneInfo(zone))
+    except (ValueError, ZoneInfoNotFoundError):
+        return None
+    # Смещение стабильно для игрока и даты даже после перезапуска сервера.
+    # Последняя группа открывается в 06:08, оставляя две минуты запаса.
+    offset = (user_id + local.date().toordinal()) % 19
+    due = datetime.combine(local.date(), time(5, 50), local.tzinfo)
+    if due + timedelta(minutes=offset) <= local <= due + timedelta(minutes=20):
+        return local.date()
+    return None
 
 
 class RevisionConflict(GameError):
@@ -110,6 +138,8 @@ class Storage:
                 player.user_id,
             )
             game_data = row["game_data"]
+            # Служебная заявка не превращает пустой игровой профиль в начатый.
+            reminder = game_data.pop("reminder", None)
             today = datetime.now(timezone.utc).date()
             revision = row["revision"]
             settings = self.settings_state(row)
@@ -143,6 +173,8 @@ class Storage:
             if request_id:
                 game_data["last_request"] = [operation, request_id]
             stats = state["stats"]
+            if reminder is not None:
+                game_data["reminder"] = reminder
             await connection.execute(
                 """
                 -- игровой снимок и таблица результатов обновляются вместе
@@ -232,43 +264,92 @@ class Storage:
         )
         return list(map(dict, rows))
 
-    async def claim_reminders(self, now: datetime) -> list[asyncpg.Record]:
-        """Не резервирует повторное уведомление на ту же местную дату."""
+    async def reminder_candidates(
+        self, now: datetime, allowed: set[int] | None
+    ) -> list[int]:
+        """Выбирает кандидатов без резервирования и без чужих тестеров."""
         players = await self.pool.fetch(
             """
-            select user_id, locale, timezone_name, reminded_on
-            from quordle_players
+            select user_id, timezone_name from quordle_players
             where reminders_enabled and user_id > 0
-            """
+                and ($1::bigint[] is null or user_id = any($1))
+            order by user_id
+            """,
+            None if allowed is None else sorted(allowed),
         )
-        result = []
-        for player in players:
-            local = now.astimezone(ZoneInfo(player["timezone_name"]))
-            if not time(5, 50) <= local.time() < time(6, 11):
-                continue
-            if player["reminded_on"] == local.date():
-                continue
-            async with self.pool.acquire() as connection, connection.transaction():
-                row = await connection.fetchrow(
-                    "select * from quordle_players where user_id = $1 for update",
-                    player["user_id"],
-                )
+        return [
+            p["user_id"] for p in players
+            if _reminder_day(now, p["user_id"], p["timezone_name"])
+        ]
+
+    async def claim_reminder(
+        self, user_id: int, now: datetime, allowed: set[int] | None
+    ) -> ReminderClaim | None:
+        """Перед отправкой атомарно резервирует одного согласившегося игрока."""
+        if user_id <= 0 or (allowed is not None and user_id not in allowed):
+            return None
+        async with self.pool.acquire() as conn, conn.transaction():
+            row = await conn.fetchrow(
+                """
+                select locale, timezone_name, game_data, reminded_on
+                from quordle_players where user_id = $1 and reminders_enabled
+                for update
+                """,
+                user_id,
+            )
+            if not row:
+                return None
+            day = _reminder_day(now, user_id, row["timezone_name"])
+            if not day or (row["reminded_on"] and row["reminded_on"] >= day):
+                return None
+            profile = row["game_data"]
+            utc_day = now.astimezone(timezone.utc).date()
+            if self.engine.first_game_completed(profile, utc_day):
+                return None
+            previous = profile.get("reminder", {})
+            attempts = 0
+            if previous.get("day", "") > day.isoformat():
+                return None
+            if previous.get("day") == day.isoformat():
+                attempts = previous["attempts"]
                 if (
-                    not row["reminders_enabled"]
-                    or row["timezone_name"] != player["timezone_name"]
-                    or row["reminded_on"] == local.date()
+                    previous["status"] != "retry" or attempts >= 3
+                    or previous["retry_at"] > now.timestamp()
                 ):
-                    continue
-                if self.engine.first_game_completed(row["game_data"], now.date()):
-                    continue
-                await connection.execute(
-                    """
-                    update quordle_players
-                    set reminded_on = $2
-                    where user_id = $1
-                    """,
-                    player["user_id"],
-                    local.date(),
-                )
-                result.append(player)
-        return result
+                    return None
+            claim = ReminderClaim(user_id, row["locale"], day, uuid4().hex)
+            await conn.execute(
+                """
+                update quordle_players
+                set game_data = jsonb_set(game_data, '{reminder}', $2::jsonb)
+                where user_id = $1
+                """,
+                user_id,
+                {"day": day.isoformat(), "token": claim.token,
+                 "status": "claimed", "attempts": attempts + 1},
+            )
+            return claim
+
+    async def finish_reminder(
+        self, claim: ReminderClaim, status: str, retry_at: datetime | None = None
+    ) -> None:
+        """Записывает доставку только при подтверждении именно этого запроса."""
+        if status not in {"sent", "retry", "blocked", "failed"}:
+            raise ValueError("Неизвестный исход напоминания.")
+        if status == "retry" and retry_at is None:
+            raise ValueError("Не указан срок повторной попытки.")
+        await self.pool.execute(
+            """
+            update quordle_players
+            set game_data = jsonb_set(
+                    game_data, '{reminder}', (game_data -> 'reminder') || $3::jsonb
+                ),
+                reminded_on = case when $4 then $5::date else reminded_on end,
+                reminders_enabled = reminders_enabled and not $6
+            where user_id = $1 and game_data -> 'reminder' ->> 'token' = $2
+                and game_data -> 'reminder' ->> 'status' = 'claimed'
+            """,
+            claim.user_id, claim.token,
+            {"status": status, "retry_at": retry_at.timestamp() if retry_at else None},
+            status == "sent", claim.day, status == "blocked",
+        )
